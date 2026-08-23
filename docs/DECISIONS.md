@@ -480,8 +480,8 @@ mapping, config validation) are resolved and recorded above / in
   function/type — two different smells under one linter — and `typecheck` reports
   both an unused import and any other compile error. The text is the only
   disambiguator, and the second half of each pair has no home: an unused
-  function/type is dropped at the sensor (forwarded, it has no guide and no
-  severity), while any non-import `typecheck` is `parse-error`.
+  function/type is forwarded as uncoached under the linter's own name (it has no
+  guide and no severity, but surfaces through `uncoached.md`), while any non-import `typecheck` is `parse-error`.
 - **golangci-lint v2's JSON differs from v1 in every shape the sensor touches.**
   Issues are wrapped (`{"Issues": [...], "Report": {...}}`), the fields are
   `FromLinter`/`Text`/`Pos.Filename`/`Pos.Line`/`Pos.Column`, output goes to
@@ -503,9 +503,10 @@ mapping, config validation) are resolved and recorded above / in
   declares `dependencies = []`; `test_every_plugin_carries_the_same_copy` now
   guards five.
 - **The bundled config comes from maratori, and the project's own always wins.**
-  `.golangci.yml` (`version: "2"`) enables only `gocyclo`, `funlen`,
-  `ineffassign`, `unused` — the four linters the routing table maps. The sensor
-  threads the config exactly like jscpd/eslint/knip: a project's own config
+  `.golangci.yml` (`version: "2"`) enables `gocyclo`, `funlen`, `ineffassign`,
+  `unused`, `errcheck`, `govet`, and `staticcheck` — the first four the routing
+  table maps, the last three forwarded as uncoached so a real defect is never
+  silently dropped. The sensor threads the config exactly like jscpd/eslint/knip: a project's own config
   (named in args or discovered on disk) is passed to golangci-lint untouched, and
   the bundled one is only the fallback for "this project has none".
 - **Pre-`--` args are forwarded to golangci-lint verbatim** — the same

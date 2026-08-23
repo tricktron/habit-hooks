@@ -191,7 +191,7 @@ the catalogue is shared — only the plugin's sensors differ).
 | `funlen`         | (any)                   | `oversized-function`  |
 | `ineffassign`    | (any)                   | `unused-variable`     |
 | `unused`         | starts with `var `      | `unused-variable`     |
-| `unused`         | (other)                 | — (dropped)           |
+| `unused`         | (other)                 | forwarded (uncoached) |
 | `typecheck`      | contains `imported and not used` | `unused-import` |
 | `typecheck`      | (other)                 | `parse-error`         |
 
@@ -199,13 +199,14 @@ the catalogue is shared — only the plugin's sensors differ).
 way to tell one smell from another under them, which is why the Go plugin routes
 on linter *and* text, not the linter alone. `unused` reports both an unused local
 (`var x` — a real `unused-variable`) and an unused function or type; the latter
-has no catalogue smell of its own, so it is **dropped at the sensor** rather than
-forwarded under a name with no guide and no severity (the same "a sensor emits
-vocabulary smells only" rule ruff and knip follow). `typecheck` splits the same
-way: an unused import is the actionable `unused-import`, while any other
-compile/type error is `parse-error`. Unmapped linters (anything beyond the rows
-above) are dropped. The bundled `.golangci.yml` enables only the four linters the
-table maps, so nothing a fallback run reports is uncoachable.
+has no catalogue smell of its own, so it is **forwarded as uncoached** under the
+linter's own name (it surfaces through `uncoached.md` with suggested severity).
+`typecheck` splits the same way: an unused import is the actionable
+`unused-import`, while any other compile/type error is `parse-error`. Unmapped
+linters (anything beyond the rows above) are likewise forwarded as uncoached.
+The bundled `.golangci.yml` enables seven linters — the four the table maps plus
+`errcheck`, `govet`, and `staticcheck`, which forward as uncoached so a real
+defect is never silently dropped.
 
 ## Uncoached smells
 
