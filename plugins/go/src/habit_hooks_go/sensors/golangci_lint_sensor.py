@@ -20,12 +20,10 @@ SMELL_BY_LINTER = {
 def smell_of(linter: str, text: str) -> str | None:
     if linter in SMELL_BY_LINTER:
         return SMELL_BY_LINTER[linter]
-    if linter == "unused" and text.startswith("var "):
-        return "unused-variable"
+    if linter == "unused":
+        return "unused-variable" if text.startswith("var ") else None
     if linter == "typecheck":
-        if "imported and not used" in text:
-            return "unused-import"
-        return "parse-error"
+        return "unused-import" if "imported and not used" in text else "parse-error"
     return None
 
 
