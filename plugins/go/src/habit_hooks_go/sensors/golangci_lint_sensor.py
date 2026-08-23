@@ -1,10 +1,11 @@
 """Run golangci-lint and print canonical findings, mapped by linter + text.
 
-The pipeline: split argv on ``--`` for the file list -> decide whether the
-project has its own config (and only then reach for the bundled fallback) ->
-run via ``tool_spawn`` -> parse the v2 JSON wrapper (``{"Issues": [...]}``) ->
-map each issue by linter + text to a smell -> group by smell. A missing
-golangci-lint answers in one line, not a traceback.
+The pipeline: split argv on the last ``--`` for the project's args and the file
+list -> thread the config that wins (a project's own, named in ``args`` or on
+disk, before the bundled fallback) through the run -> run via ``tool_spawn`` ->
+parse the v2 JSON wrapper (``{"Issues": [...]}``) -> map each issue by linter +
+text to a smell -> group by smell. A missing golangci-lint answers in one line,
+not a traceback.
 """
 
 from __future__ import annotations
@@ -38,18 +39,60 @@ SMELL_BY_LINTER = {
 TOOL_EXIT_CODES = (0, 1)
 
 
-def config_arguments() -> list[str]:
-    """Ours, only where the project has none of its own.
+def split_argv(argv: list[str]) -> tuple[list[str], list[str]]:
+    """``argv``, split on the last literal ``--``: the project's args before it,
+    the files to analyse after.
 
-    The project's config is authoritative; the bundled one is the fallback for
-    "this project has none" — the shape every wrapped-tool sensor keeps.
+    The template spells ``${args} -- ${files}``, so the separator sits after
+    everything ``args`` can contribute and before every file: the *last* ``--``
+    is always ours, whatever a project wrote into its args.
     """
+    if "--" not in argv:
+        return argv, []
+    index = len(argv) - 1 - argv[::-1].index("--")
+    return argv[:index], argv[index + 1 :]
+
+
+def _named_config(project_args: list[str]) -> Path | None:
+    """The config a project named itself in ``args``, if it named one.
+
+    Both pflag spellings golangci-lint accepts: ``--config path`` and
+    ``--config=path``.
+    """
+    for i, token in enumerate(project_args):
+        if token == "--config":
+            if i + 1 < len(project_args):
+                return Path(project_args[i + 1])
+        elif token.startswith("--config="):
+            return Path(token.partition("=")[2])
+    return None
+
+
+def config_in_force(project_args: list[str]) -> tuple[list[str], Path]:
+    """The config that wins, and the dir golangci-lint anchors paths to.
+
+    The shape every wrapped-tool sensor keeps: the project's own config is
+    authoritative, the bundled one is the fallback for "this project has none".
+    A project can name its config on disk (a standard filename in the root) or
+    through ``args`` (a ``--config`` of its own) — both stand.
+
+    golangci-lint v2 resolves an issue's ``Pos.Filename`` against the config
+    file it used, not the cwd: the base is therefore the directory of the config
+    in force — the named config's parent, the root when one was discovered, or
+    the bundled config's own directory when the fallback runs. The sensor
+    re-joins each reported path against it before the runner re-expresses them.
+    """
+    named = _named_config(project_args)
+    if named is not None:
+        return [], named.resolve().parent
     if any((Path.cwd() / name).exists() for name in PROJECT_CONFIG_NAMES):
-        return []
-    return ["--config", str(BUNDLED_CONFIG)]
+        return [], Path.cwd()
+    return ["--config", str(BUNDLED_CONFIG)], BUNDLED_CONFIG.parent
 
 
-def run_golangci_lint(files: list[str]) -> subprocess.CompletedProcess[str]:
+def run_golangci_lint(
+    files: list[str], project_args: list[str], config_args: list[str]
+) -> subprocess.CompletedProcess[str]:
     """What golangci-lint said, or what a shell says about one nobody installed.
 
     A missing golangci-lint raised a ``FileNotFoundError`` out of here, making
@@ -68,7 +111,8 @@ def run_golangci_lint(files: list[str]) -> subprocess.CompletedProcess[str]:
         "--output.text.path",
         "stderr",
         "--show-stats=false",
-        *config_arguments(),
+        *project_args,
+        *config_args,
         *files,
     ]
     try:
@@ -99,20 +143,6 @@ def smell_of(linter: str, text: str) -> str | None:
     return None
 
 
-def _path_base() -> Path:
-    """The directory golangci-lint pins ``Pos.Filename`` to.
-
-    golangci-lint v2 resolves output paths against the config file it used, not
-    the cwd: the bundled fallback is passed by ``--config``, so paths land
-    relative to the plugin's own directory (deep inside the package) instead of
-    the project, and the sensor re-joins them against it before the runner
-    re-expresses them. With the project's own config the paths are already
-    cwd-relative, so the base is the cwd. The base always names the config
-    actually in force, whichever spelling won.
-    """
-    return BUNDLED_CONFIG.parent if config_arguments() else Path.cwd()
-
-
 def issue(entry: dict, base: Path) -> dict:
     # A path golangci-lint anchored at ``base`` is re-joined against it, so the
     # runner's anchoring (see "Finding paths are anchored at the sensor
@@ -130,8 +160,8 @@ def issue(entry: dict, base: Path) -> dict:
     }
 
 
-def findings(entries: list[dict]) -> list[dict]:
-    base = _path_base()
+def findings(entries: list[dict], base: Path) -> list[dict]:
+    """v2 ``Issue`` entries to canonical findings, grouped by smell (sorted)."""
     by_smell: dict[str, list[dict]] = {}
     for entry in entries:
         smell = smell_of(entry["FromLinter"], entry["Text"])
@@ -149,13 +179,13 @@ def findings(entries: list[dict]) -> list[dict]:
 
 
 def main() -> int:
-    args = sys.argv[1:]
-    files = args[args.index("--") + 1 :] if "--" in args else args
-    result = run_golangci_lint(files)
+    project_args, files = split_argv(sys.argv[1:])
+    config_args, base = config_in_force(project_args)
+    result = run_golangci_lint(files, project_args, config_args)
     if golangci_lint_crashed(result):
         sys.stderr.write(result.stderr)
         return 2
-    print(json.dumps(findings(issues(result))))
+    print(json.dumps(findings(issues(result), base)))
     return 0
 
 
