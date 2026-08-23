@@ -32,7 +32,16 @@ from tool_spawn import run_tool
 
 # A project naming no config of its own is linted with ours — the "this project
 # has none" fallback, never an override (see "A wrapped tool's own config wins").
-PROJECT_CONFIG_NAMES = (".golangci.yml", ".golangci.yaml", "golangci.yml")
+# The dot-prefixed names golangci-lint v2 discovers itself (verified against
+# 2.12.2): .yml, .yaml, .toml, .json. A bare ``golangci.yml`` is NOT discovered
+# — listing it here would make the sensor stand aside thinking the project's
+# config was in force, while golangci-lint silently ran with defaults.
+PROJECT_CONFIG_NAMES = (
+    ".golangci.yml",
+    ".golangci.yaml",
+    ".golangci.toml",
+    ".golangci.json",
+)
 
 # The sensor helper is a loose script, so its own directory is ``sys.path[0]``
 # and the bundled config lives one directory above it, off the script's path.
