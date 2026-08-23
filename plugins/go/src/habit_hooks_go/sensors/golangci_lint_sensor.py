@@ -6,14 +6,26 @@ disk, before the bundled fallback) through the run -> run via ``tool_spawn`` ->
 parse the v2 JSON wrapper (``{"Issues": [...]}``) -> map each issue by linter +
 text to a smell -> group by smell. A missing golangci-lint answers in one line,
 not a traceback.
+
+golangci-lint v2 cannot typecheck individual files from different directories
+(Go's type checker needs full package context), so ``./...`` is passed to it
+instead of the file list: it discovers packages itself, while the ``files``
+config in ``config.toml`` still scopes what is source and golangci-lint has its
+own skip patterns.
+
+golangci-lint's cache keys on content, not paths: a cache hit from a previous
+run in a different directory returns ``Pos.Filename`` values pointing there, so
+each run gets a fresh cache dir via ``GOLANGCI_LINT_CACHE_DIR``.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from tool_spawn import run_tool
@@ -99,6 +111,20 @@ def run_golangci_lint(
     internals the diagnosis; this wrapper answers the way the shell would
     (``127``, ``golangci-lint: command not found``) so the run names the missing
     tool in one line.
+
+    ``files`` is accepted (it is still split out of argv) but deliberately not
+    used: golangci-lint v2 cannot accept individual files from different
+    directories (Go's type checker needs full package context), so ``./...`` is
+    passed instead. The ``files`` config in config.toml already scopes what is
+    source, and golangci-lint has its own skip patterns.
+
+    golangci-lint's cache keys on content, not paths: a cache hit from a
+    previous run in a different directory returns stale ``Pos.Filename``
+    values pointing there. v2 has no config or flag to disable caching, so
+    ``GOLANGCI_LINT_CACHE`` is pointed at a fresh temp dir each run —
+    effectively no cache, but the only way to keep paths honest. The cost
+    is re-analysis on every run; the alternative is silently dropped
+    findings (a false-clean).
     """
     command = [
         "golangci-lint",
@@ -113,14 +139,19 @@ def run_golangci_lint(
         "--show-stats=false",
         *project_args,
         *config_args,
-        *files,
+        # golangci-lint v2 cannot accept individual files from different
+        # directories (Go's type checker needs full package context), so
+        # ``./...`` is passed instead of ``files``.
+        "./...",
     ]
-    try:
-        return run_tool(command)
-    except FileNotFoundError:
-        return subprocess.CompletedProcess(
-            command, 127, "", "golangci-lint: command not found\n"
-        )
+    with tempfile.TemporaryDirectory(prefix="golangci-lint-cache-") as cache_dir:
+        os.environ["GOLANGCI_LINT_CACHE"] = cache_dir
+        try:
+            return run_tool(command)
+        except FileNotFoundError:
+            return subprocess.CompletedProcess(
+                command, 127, "", "golangci-lint: command not found\n"
+            )
 
 
 def golangci_lint_crashed(result: subprocess.CompletedProcess[str]) -> bool:
@@ -148,12 +179,22 @@ def issue(entry: dict, base: Path) -> dict:
     # runner's anchoring (see "Finding paths are anchored at the sensor
     # boundary") is fed a path that actually points into the project.
     filename = os.path.normpath(str(base / entry["Pos"]["Filename"]))
+    line, column = entry["Pos"]["Line"], entry["Pos"]["Column"]
+    # Analysing via ``./...``, golangci-lint v2 reports a package-level typecheck
+    # error as a synthetic issue whose ``Pos`` collapses to line 1, column 0
+    # (offset 0), with the real position embedded at the start of its ``Text``
+    # as ``file:line:col: message``. Recover it, or every such finding would
+    # coach the file's first line instead of the broken one.
+    if entry["Pos"]["Line"] == 1 and entry["Pos"]["Column"] == 0:
+        match = re.search(r"(\d+):(\d+): ", entry["Text"])
+        if match:
+            line, column = int(match.group(1)), int(match.group(2))
     return {
         "key": filename,
         "details": {
             "file": filename,
-            "line": entry["Pos"]["Line"],
-            "column": entry["Pos"]["Column"],
+            "line": line,
+            "column": column,
             "message": entry["Text"],
             "source": "golangci-lint:" + entry["FromLinter"],
         },
