@@ -35,6 +35,31 @@ def test_zero_issues_is_no_findings() -> None:
     assert findings([]) == []
 
 
+def test_many_entries_group_by_smell_sorted_alphabetically() -> None:
+    """Insertion order is deliberately the reverse of the alphabetical group
+    order, so a test that merely preserved input order would still pass unless
+    the sort is checked."""
+    unused_variable = _entry("ineffassign", filename="b.go")
+    high_complexity = _entry("gocyclo", filename="a.go")
+
+    result = findings([unused_variable, high_complexity])
+
+    assert [finding["smell"] for finding in result] == [
+        "high-complexity",
+        "unused-variable",
+    ]
+
+
+def test_two_issues_for_the_same_smell_share_one_finding() -> None:
+    first = _entry("gocyclo", filename="a.go", line=1)
+    second = _entry("gocyclo", filename="a.go", line=2)
+
+    result = findings([first, second])
+
+    assert len(result) == 1
+    assert [issue["details"]["line"] for issue in result[0]["issues"]] == [1, 2]
+
+
 @pytest.mark.parametrize("linter", sorted(SMELL_BY_LINTER))
 def test_every_mapped_linter_reaches_its_own_smell(linter: str) -> None:
     result = findings([_entry(linter)])
@@ -58,3 +83,23 @@ def test_unused_with_func_prefix_is_dropped() -> None:
     entry["Text"] = "func foo is unused"
 
     assert findings([entry]) == []
+
+
+def test_typecheck_with_imported_and_not_used_is_unused_import() -> None:
+    entry = _entry("typecheck")
+    entry["Text"] = 'main.go:5:2: imported and not used: "fmt"'
+
+    result = findings([entry])
+
+    assert [finding["smell"] for finding in result] == ["unused-import"]
+    assert result[0]["issues"][0]["details"]["source"] == "golangci-lint:typecheck"
+
+
+def test_typecheck_with_other_text_is_parse_error() -> None:
+    entry = _entry("typecheck")
+    entry["Text"] = "main.go:3:1: expected declaration, found '}'"
+
+    result = findings([entry])
+
+    assert [finding["smell"] for finding in result] == ["parse-error"]
+    assert result[0]["issues"][0]["details"]["source"] == "golangci-lint:typecheck"

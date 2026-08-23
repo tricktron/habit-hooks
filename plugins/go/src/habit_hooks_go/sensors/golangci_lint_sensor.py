@@ -8,6 +8,7 @@ built out in the inner TDD loop.
 
 from __future__ import annotations
 
+import subprocess
 import sys
 
 SMELL_BY_LINTER = {
@@ -15,6 +16,16 @@ SMELL_BY_LINTER = {
     "funlen": "oversized-function",
     "ineffassign": "unused-variable",
 }
+
+# golangci-lint's own contract (v2): 0 is clean, 1 is "issues found" — both
+# trustworthy. Anything else (3 = flag error in v2, 127 = tool not found,
+# -9 = killed) is golangci-lint never having produced a real report, mirroring
+# ruff_sensor.TOOL_EXIT_CODES.
+TOOL_EXIT_CODES = (0, 1)
+
+
+def golangci_lint_crashed(result: subprocess.CompletedProcess[str]) -> bool:
+    return result.returncode not in TOOL_EXIT_CODES
 
 
 def smell_of(linter: str, text: str) -> str | None:
