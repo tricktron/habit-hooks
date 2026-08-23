@@ -8,10 +8,9 @@ text to a smell -> group by smell. A missing golangci-lint answers in one line,
 not a traceback.
 
 golangci-lint v2 cannot typecheck individual files from different directories
-(Go's type checker needs full package context), so ``./...`` is passed to it
-instead of the file list: it discovers packages itself, while the ``files``
-config in ``config.toml`` still scopes what is source and golangci-lint has its
-own skip patterns.
+(Go's type checker needs full package context), so the unique parent
+directories of the file list are passed instead — only packages with changed
+files are linted, preserving the scoping habit-hooks narrows to.
 
 golangci-lint's cache keys on content, not paths: a cache hit from a previous
 run in a different directory returns ``Pos.Filename`` values pointing there, so
@@ -112,11 +111,12 @@ def run_golangci_lint(
     (``127``, ``golangci-lint: command not found``) so the run names the missing
     tool in one line.
 
-    ``files`` is accepted (it is still split out of argv) but deliberately not
-    used: golangci-lint v2 cannot accept individual files from different
-    directories (Go's type checker needs full package context), so ``./...`` is
-    passed instead. The ``files`` config in config.toml already scopes what is
-    source, and golangci-lint has its own skip patterns.
+    golangci-lint v2 cannot accept individual ``.go`` files from different
+    directories — Go's type checker needs full package context, and "named
+    files must all be in one directory" is its own error. The unique parent
+    directories of ``files`` are passed instead, so only packages with changed
+    files are linted (the scoping habit-hooks narrows to), and golangci-lint
+    typechecks each package independently.
 
     golangci-lint's cache keys on content, not paths: a cache hit from a
     previous run in a different directory returns stale ``Pos.Filename``
@@ -126,6 +126,7 @@ def run_golangci_lint(
     is re-analysis on every run; the alternative is silently dropped
     findings (a false-clean).
     """
+    dirs = sorted({str(Path(f).parent) for f in files})
     command = [
         "golangci-lint",
         "run",
@@ -139,10 +140,10 @@ def run_golangci_lint(
         "--show-stats=false",
         *project_args,
         *config_args,
-        # golangci-lint v2 cannot accept individual files from different
-        # directories (Go's type checker needs full package context), so
-        # ``./...`` is passed instead of ``files``.
-        "./...",
+        # Parent directories, not individual files: golangci-lint v2 cannot
+        # typecheck files from different directories together, but it accepts
+        # multiple directory paths and typechecks each package independently.
+        *dirs,
     ]
     with tempfile.TemporaryDirectory(prefix="golangci-lint-cache-") as cache_dir:
         os.environ["GOLANGCI_LINT_CACHE"] = cache_dir
@@ -180,7 +181,7 @@ def issue(entry: dict, base: Path) -> dict:
     # boundary") is fed a path that actually points into the project.
     filename = os.path.normpath(str(base / entry["Pos"]["Filename"]))
     line, column = entry["Pos"]["Line"], entry["Pos"]["Column"]
-    # Analysing via ``./...``, golangci-lint v2 reports a package-level typecheck
+    # golangci-lint v2 reports a package-level typecheck
     # error as a synthetic issue whose ``Pos`` collapses to line 1, column 0
     # (offset 0), with the real position embedded at the start of its ``Text``
     # as ``file:line:col: message``. Recover it, or every such finding would
@@ -221,6 +222,9 @@ def findings(entries: list[dict], base: Path) -> list[dict]:
 
 def main() -> int:
     project_args, files = split_argv(sys.argv[1:])
+    if not files:
+        print("[]")
+        return 0
     config_args, base = config_in_force(project_args)
     result = run_golangci_lint(files, project_args, config_args)
     if golangci_lint_crashed(result):
