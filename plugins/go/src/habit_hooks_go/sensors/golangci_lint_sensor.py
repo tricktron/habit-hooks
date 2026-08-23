@@ -22,6 +22,10 @@ def smell_of(linter: str, text: str) -> str | None:
         return SMELL_BY_LINTER[linter]
     if linter == "unused" and text.startswith("var "):
         return "unused-variable"
+    if linter == "typecheck":
+        if "imported and not used" in text:
+            return "unused-import"
+        return "parse-error"
     return None
 
 
