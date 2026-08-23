@@ -186,6 +186,7 @@ the catalogue is shared — only the plugin's sensors differ).
 
 | Raw key (linter) | Text condition          | Smell key             |
 |------------------|-------------------------|-----------------------|
+| `cyclop`         | (any)                   | `high-complexity`     |
 | `gocyclo`        | (any)                   | `high-complexity`     |
 | `funlen`         | (any)                   | `oversized-function`  |
 | `ineffassign`    | (any)                   | `unused-variable`     |
