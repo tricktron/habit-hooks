@@ -10,6 +10,7 @@ golangci-lint answers in one line, not a traceback.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -98,11 +99,29 @@ def smell_of(linter: str, text: str) -> str | None:
     return None
 
 
-def issue(entry: dict) -> dict:
+def _path_base() -> Path:
+    """The directory golangci-lint pins ``Pos.Filename`` to.
+
+    golangci-lint v2 resolves output paths against the config file it used, not
+    the cwd: the bundled fallback is passed by ``--config``, so paths land
+    relative to the plugin's own directory (deep inside the package) instead of
+    the project, and the sensor re-joins them against it before the runner
+    re-expresses them. With the project's own config the paths are already
+    cwd-relative, so the base is the cwd. The base always names the config
+    actually in force, whichever spelling won.
+    """
+    return BUNDLED_CONFIG.parent if config_arguments() else Path.cwd()
+
+
+def issue(entry: dict, base: Path) -> dict:
+    # A path golangci-lint anchored at ``base`` is re-joined against it, so the
+    # runner's anchoring (see "Finding paths are anchored at the sensor
+    # boundary") is fed a path that actually points into the project.
+    filename = os.path.normpath(str(base / entry["Pos"]["Filename"]))
     return {
-        "key": entry["Pos"]["Filename"],
+        "key": filename,
         "details": {
-            "file": entry["Pos"]["Filename"],
+            "file": filename,
             "line": entry["Pos"]["Line"],
             "column": entry["Pos"]["Column"],
             "message": entry["Text"],
@@ -112,6 +131,7 @@ def issue(entry: dict) -> dict:
 
 
 def findings(entries: list[dict]) -> list[dict]:
+    base = _path_base()
     by_smell: dict[str, list[dict]] = {}
     for entry in entries:
         smell = smell_of(entry["FromLinter"], entry["Text"])
@@ -122,7 +142,7 @@ def findings(entries: list[dict]) -> list[dict]:
         {
             "smell": smell,
             "details": {},
-            "issues": [issue(entry) for entry in by_smell[smell]],
+            "issues": [issue(entry, base) for entry in by_smell[smell]],
         }
         for smell in sorted(by_smell)
     ]
