@@ -1,25 +1,4 @@
-"""Resolve which golangci-lint config wins, run the tool, and parse its output.
-
-The config-precedence shape every wrapped-tool sensor keeps: the project's own
-config is authoritative, the bundled one is the fallback for "this project has
-none". A project can name its config on disk (a standard filename in the root)
-or through ``args`` (a ``--config`` of its own) — both stand.
-
-golangci-lint v2 resolves an issue's ``Pos.Filename`` against the config file
-it used, not the cwd: the base returned by ``config_in_force`` is the directory
-of the config in force, and the sensor re-joins each reported path against it
-before the runner re-expresses them.
-
-golangci-lint v2 cannot typecheck individual files from different directories
-(Go's type checker needs full package context), so the unique parent
-directories of the file list are passed instead — only packages with changed
-files are linted, preserving the scoping habit-hooks narrows to.
-
-golangci-lint's cache keys on content, not paths: a cache hit from a different
-project returns ``Pos.Filename`` values pointing there. ``GOLANGCI_LINT_CACHE``
-is scoped to a per-project directory (keyed by cwd) so the cache stays warm
-within a project while isolating it from every other.
-"""
+"""Resolve which golangci-lint config wins, run the tool, and parse its output."""
 
 from __future__ import annotations
 
@@ -118,21 +97,6 @@ def run_golangci_lint(
     internals the diagnosis; this wrapper answers the way the shell would
     (``127``, ``golangci-lint: command not found``) so the run names the missing
     tool in one line.
-
-    golangci-lint v2 cannot accept individual ``.go`` files from different
-    directories — Go's type checker needs full package context, and "named
-    files must all be in one directory" is its own error. The unique parent
-    directories of ``files`` are passed instead, so only packages with changed
-    files are linted (the scoping habit-hooks narrows to), and golangci-lint
-    typechecks each package independently.
-
-    golangci-lint's cache keys on content + relative path, not absolute paths:
-    identical files at the same relative path in different projects share a
-    cache entry, and the cached ``Pos.Filename`` points to the wrong project.
-    ``GOLANGCI_LINT_CACHE`` is scoped to a per-project directory (keyed by
-    cwd hash) so the cache stays warm within a project while isolating it
-    from every other — the default shared cache is the source of the
-    stale-path false-clean.
     """
     dirs = sorted({str(Path(f).parent) for f in files})
     command = [
