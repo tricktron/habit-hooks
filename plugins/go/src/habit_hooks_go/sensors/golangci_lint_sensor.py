@@ -47,7 +47,7 @@ def smell_of(linter: str, text: str) -> str | None:
     if linter in SMELL_BY_LINTER:
         return SMELL_BY_LINTER[linter]
     if linter == "unused":
-        return "unused-variable" if text.startswith("var ") else None
+        return "unused-variable" if text.startswith("var ") else linter
     if linter == "typecheck":
         return "unused-import" if "imported and not used" in text else "parse-error"
     # Any linter a project enabled that this plugin has no catalogue smell for
@@ -55,8 +55,6 @@ def smell_of(linter: str, text: str) -> str | None:
     # ``uncoached.md`` (suggested severity). The message is specific and
     # self-coaching, so no guide is needed. A project escalates with
     # ``uncoached = "enforce"`` or ``[smells.<linter>] severity = "enforced"``.
-    # The only deliberate drop is ``unused`` without ``var `` — an unused
-    # function/type has no catalogue smell and forwarding it would be noise.
     return linter
 
 

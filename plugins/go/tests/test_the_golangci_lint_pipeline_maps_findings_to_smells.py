@@ -86,11 +86,14 @@ def test_unused_with_var_prefix_is_unused_variable() -> None:
     assert result[0]["issues"][0]["details"]["source"] == "golangci-lint:unused"
 
 
-def test_unused_with_func_prefix_is_dropped() -> None:
+def test_unused_with_func_prefix_is_forwarded_as_uncoached() -> None:
     entry = _entry("unused")
     entry["Text"] = "func foo is unused"
 
-    assert findings([entry], _BASE) == []
+    result = findings([entry], _BASE)
+
+    assert [finding["smell"] for finding in result] == ["unused"]
+    assert result[0]["issues"][0]["details"]["source"] == "golangci-lint:unused"
 
 
 def test_typecheck_with_imported_and_not_used_is_unused_import() -> None:

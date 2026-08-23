@@ -313,15 +313,15 @@ habit-sensors --all | jq '.[] | {smell, language, key: (.issues[0].key | sub(".*
 }
 ```
 
-## An unused func is not forwarded
+## An unused func is forwarded as uncoached
 
 The `unused` linter reports an unused function as `func unused is unused` —
-`"func "`, not `"var "`, so the routing table's unused row has no smell for it
-and the issue is **dropped**, the same "a sensor emits vocabulary smells only"
-rule ruff and knip follow. `main` is always considered used, so the fixture's
-one unused function is `unused`, kept small and straight-line (so neither
-`funlen` nor `gocyclo` fires) and the lone candidate for forwarding. With
-nothing else in the file, a clean run is the whole assertion.
+`"func "`, not `"var "`, so it has no catalogue smell. Rather than dropping it,
+the sensor forwards it under the `unused` smell key, surfacing through
+`uncoached.md` (suggested severity) — the same treatment every unmapped linter
+gets. `main` is always considered used, so the fixture's one unused function is
+`unused`, kept small and straight-line (so neither `funlen` nor `gocyclo`
+fires) and the lone finding.
 
 📄main.go
 ```go
@@ -335,12 +335,18 @@ func main() {}
 ```
 
 ```bash
-habit-sensors --all
+habit-sensors --all | jq '.[] | {smell, language, key: (.issues[0].key | sub(".*/"; "")), line: .issues[0].details.line, source: .issues[0].details.source}'
 ```
 
-🖥️ ✅
+🖥️
 ```json
-[]
+{
+  "smell": "unused",
+  "language": "go",
+  "key": "main.go",
+  "line": 3,
+  "source": "golangci-lint:unused"
+}
 ```
 
 ## A project's own config wins
