@@ -73,6 +73,21 @@ def test_a_java_project_is_recommended_java(tmp_path: Path) -> None:
     assert recommendations(tmp_path, ["src/App.java"], PluginStatus(set(), _on_hand())) != []
 
 
+def test_a_go_project_is_recommended_go(tmp_path: Path) -> None:
+    """A `go.mod` — the module file every Go project carries — counts as go, as
+    does any `.go` file in scope."""
+    (tmp_path / "go.mod").write_text("module example.com/acme\n", encoding="utf-8")
+    assert recommendations(tmp_path, [], PluginStatus(set(), _on_hand())) == [
+        "habit-sensors: detected go; "
+        "consider `pip install habit-hooks-go`, "
+        'then add "go" to `plugins` in .habit-hooks/config.toml'
+    ]
+
+    (tmp_path / "go.mod").unlink()
+    assert recommendations(tmp_path, ["src/main.go"], PluginStatus(set(), _on_hand())) != []
+    assert recommendations(tmp_path, [], PluginStatus({"go"}, _on_hand("go"))) == []
+
+
 def test_a_vendored_plugin_counts_as_installed(tmp_path: Path) -> None:
     """``Resolver.has_plugin`` is the question, so a plugin vendored under
     ``.habit-hooks/<name>/`` — the install route the README offers where extras

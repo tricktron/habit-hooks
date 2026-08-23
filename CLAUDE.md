@@ -559,6 +559,21 @@ through `realpath` so a *project* reached via a symlink still anchors; a source
 tree pointing outside the project cannot, and there is no correct repo-relative
 name for it. Point the sensor at the real directory, or scope it out.
 
+### golangci-lint v2 anchors issue paths to the config file it used, not cwd
+
+`Pos.Filename` in golangci-lint v2's JSON resolves relative to the directory of
+the `.golangci.yml` in force, so the bundled fallback (deep inside the installed
+package) reports `../..`-laden paths the core's anchoring rejects — files that
+appear to live outside the project. The Go sensor therefore re-joins each
+`Pos.Filename` against the config-in-force's directory before emitting
+(`config_in_force` returns it: a `--config` named in args → that file's parent,
+a discovered `.golangci.yml` → cwd, the fallback → the package's own dir). This
+is **not** the sensor doing its own anchoring — the core's boundary still
+re-expresses every path, and what the sensor did was only make `Pos.Filename`
+point into the project instead of away from it. Any future wrapper of a tool
+that anchors to a config (not cwd) needs the same re-join; guessing cwd is how
+the paths escaped the project root.
+
 ### knip runs a gated second pass in production mode (issue #59, rebuilt #99)
 
 `plugins/typescript/src/habit_hooks_typescript/sensors/knip.cjs` runs knip
@@ -789,20 +804,20 @@ argument whatever it looks like.
 **That fixes only a part's own `argv[0]`, and no shipped sensor spells its
 wrapped tool there.** Every one is `argv = ["${python}", "${dir}/<helper>.py",
 ...]` or `["node", "...cjs", ...]`, and the helper then spawns
-`jscpd`/`pmd`/`deptry`/`phpmd`/`knip`/`eslint` itself, one process further in —
+`jscpd`/`pmd`/`deptry`/`phpmd`/`golangci-lint`/`knip`/`eslint` itself, one process further in —
 where the tools that actually go missing on Windows go missing. That spawn now
 goes through one of two seams, split by language, and they cannot be merged
 into one:
 
-- **The four Python plugins** (generic, java, php, python) share
+- **The five Python plugins** (generic, java, php, python, go) share
   `sensors/tool_spawn.py` — byte-identical copies. It runs `shutil.which(name)`
   along the `PATH` habit-hooks hands the helper (the same `tool_search_path` a
   part's own resolution asks, so it is not a second answer to that question),
-  then spawns whatever file that resolves to. It is four copies rather than one
+  then spawns whatever file that resolves to. It is five copies rather than one
   shared module because every plugin's `pyproject.toml` declares
   `dependencies = []`: none may import `habit-hooks`, or each other, so a
   helper cannot reach a shared implementation living in the core or in a
-  sibling plugin — four copies is what "no dependency" costs, and
+  sibling plugin — five copies is what "no dependency" costs, and
   `tests/test_helpers_spawn_by_file.py::test_every_plugin_carries_the_same_copy`
   is the gate that keeps them from drifting apart unnoticed.
 - **The TypeScript plugin** uses `sensors/project_tool.cjs` instead: it finds

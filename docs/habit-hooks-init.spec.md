@@ -75,6 +75,47 @@ cat .habit-hooks/config.toml
 plugins = ["python", "generic"]
 ```
 
+## A Go project gets the go plugin too
+
+`go.mod` is Go's module file — the one file every Go project carries — so a
+`go.mod` adds the `go` plugin to the plan, exactly as `pyproject.toml` adds
+`python`. That `pyproject.toml` is a fixture every case in this file starts with,
+so the same run detects `python` too: what this case proves is that the `go.mod`
+on top of it is what the `go` plugin owes its place to.
+
+📄.habit-hooks/go/config.toml
+```toml
+detectors = []
+```
+
+📄go.mod
+```go
+module example.com/acme
+
+go 1.22
+```
+
+```bash
+habit-hooks init
+```
+
+🖥️ ✅
+```text
+Detected: python, go.
+Wrote .habit-hooks/config.toml, enabling python, go, generic.
+
+Nothing missing — run `habit-hooks` to see what it finds.
+```
+
+```bash
+cat .habit-hooks/config.toml
+```
+
+🖥️ ✅
+```text
+plugins = ["python", "go", "generic"]
+```
+
 ## A tool the plugins need and this machine has not got
 
 A plugin declares the tools its sensors reach for, and `init` looks for each one

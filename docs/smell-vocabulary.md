@@ -178,6 +178,34 @@ falls back to the bundled `pmd-ruleset.xml` — a project's own ruleset wins
 ([config.md](config.md)). PMD 7's `UnnecessaryImport` is the renamed
 `UnusedImports`.
 
+## Go plugin translation
+
+golangci-lint v2 reports each issue with a linter name (`FromLinter`) and the
+offending text; the Go plugin translates them into the smell keys (the rest of
+the catalogue is shared — only the plugin's sensors differ).
+
+| Raw key (linter) | Text condition          | Smell key             |
+|------------------|-------------------------|-----------------------|
+| `gocyclo`        | (any)                   | `high-complexity`     |
+| `funlen`         | (any)                   | `oversized-function`  |
+| `ineffassign`    | (any)                   | `unused-variable`     |
+| `unused`         | starts with `var `      | `unused-variable`     |
+| `unused`         | (other)                 | — (dropped)           |
+| `typecheck`      | contains `imported and not used` | `unused-import` |
+| `typecheck`      | (other)                 | `parse-error`         |
+
+`unused` and `typecheck` are ambiguous — golangci-lint's message text is the only
+way to tell one smell from another under them, which is why the Go plugin routes
+on linter *and* text, not the linter alone. `unused` reports both an unused local
+(`var x` — a real `unused-variable`) and an unused function or type; the latter
+has no catalogue smell of its own, so it is **dropped at the sensor** rather than
+forwarded under a name with no guide and no severity (the same "a sensor emits
+vocabulary smells only" rule ruff and knip follow). `typecheck` splits the same
+way: an unused import is the actionable `unused-import`, while any other
+compile/type error is `parse-error`. Unmapped linters (anything beyond the rows
+above) are dropped. The bundled `.golangci.yml` enables only the four linters the
+table maps, so nothing a fallback run reports is uncoachable.
+
 ## Uncoached smells
 
 A smell with no entry above still renders — through the generic `uncoached.md`

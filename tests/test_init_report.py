@@ -143,7 +143,7 @@ def test_an_unrecognised_project_is_offered_a_plugin_to_write() -> None:
 
     assert "Detected: no language habit-hooks has a plugin for." in reported
     assert (
-        "habit-hooks ships plugins for python, typescript, php and java."
+        "habit-hooks ships plugins for python, typescript, php, java and go."
         in reported
     )
 

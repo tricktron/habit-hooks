@@ -461,3 +461,54 @@ mapping, config validation) are resolved and recorded above / in
   `unused-import`, `unused-file`, `unused-dependency`, `unused-class-member` are
   all enforced). A project that wants it advisory sets
   `[smells.unused-export] severity = "suggested"`.
+
+## The Go plugin wraps golangci-lint v2 (2026-08, agent decision)
+
+- **The `go` plugin wraps golangci-lint v2 and maps to the five existing
+  catalogue smells** (`high-complexity`, `oversized-function`, `unused-variable`,
+  `unused-import`, `parse-error`). No new catalogue entries and no new guides:
+  every smell it emits already has an enforced entry and a generic guide, so the
+  plugin is a sensor + a bundled config + package scaffolding. Its
+  `config.toml` declares `language = "go"`,
+  `files = ["**/*.go", "!**/vendor/**"]` and a `golangci-lint` detector; the one
+  core change is `go` joining `recommend.LANGUAGE_SIGNALS` (`go.mod`, `.go`), so
+  `habit-hooks init` plans the plugin for a Go project and a run recommends it —
+  the same table every language plugin joins through, and the only place `init`'s
+  "ships plugins for …" line is derived from.
+- **Routing is by `FromLinter` + `Text` prefix, not the linter name alone.**
+  golangci-lint v2's `unused` reports both an unused local (`var`…) and an unused
+  function/type — two different smells under one linter — and `typecheck` reports
+  both an unused import and any other compile error. The text is the only
+  disambiguator, and the second half of each pair has no home: an unused
+  function/type is dropped at the sensor (forwarded, it has no guide and no
+  severity), while any non-import `typecheck` is `parse-error`.
+- **golangci-lint v2's JSON differs from v1 in every shape the sensor touches.**
+  Issues are wrapped (`{"Issues": [...], "Report": {...}}`), the fields are
+  `FromLinter`/`Text`/`Pos.Filename`/`Pos.Line`/`Pos.Column`, output goes to
+  stdout via `--output.json.path stdout`, and the text formatter is sent to
+  stderr (`--output.text.path stderr --show-stats=false`) so stdout stays pure
+  JSON. The one force the slice assumed — v1's flat field names and
+  `--out-format json` — does not exist in v2.
+- **golangci-lint v2 resolves `Pos.Filename` relative to the config file's
+  directory, not cwd.** With the bundled fallback (deep inside the installed
+  package) that produced `..`-laden paths the core's anchoring rejected. The
+  sensor does **not** anchor itself (it respects the boundary in "Finding paths
+  are anchored at the sensor boundary") — it re-joins each reported path against
+  the config-in-force's directory before emitting, so the core's anchoring
+  receives a path pointing into the project. `config_in_force` returns that
+  directory: a `--config` named in args → its parent; a discovered `.golangci.yml`
+  → cwd; the bundled fallback → the package's own directory.
+- **`tool_spawn.py` extends to a fifth byte-identical copy.** Every Python
+  plugin (generic, java, php, python, now go) ships its own copy because each
+  declares `dependencies = []`; `test_every_plugin_carries_the_same_copy` now
+  guards five.
+- **The bundled config comes from maratori, and the project's own always wins.**
+  `.golangci.yml` (`version: "2"`) enables only `gocyclo`, `funlen`,
+  `ineffassign`, `unused` — the four linters the routing table maps. The sensor
+  threads the config exactly like jscpd/eslint/knip: a project's own config
+  (named in args or discovered on disk) is passed to golangci-lint untouched, and
+  the bundled one is only the fallback for "this project has none".
+- **Pre-`--` args are forwarded to golangci-lint verbatim** — the same
+  split-on-the-last-`--` PMD uses, so a project's own `--config` and flags reach
+  the tool while `${files}` files follow the separator. Before this, the whole
+  `${args}` half was dropped.

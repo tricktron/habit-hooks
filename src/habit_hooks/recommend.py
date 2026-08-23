@@ -31,6 +31,7 @@ LANGUAGE_SIGNALS = (
     LanguageSignal("typescript", ("tsconfig.json",), (".ts", ".tsx")),
     LanguageSignal("php", ("composer.json",), (".php",)),
     LanguageSignal("java", ("pom.xml", "build.gradle", "build.gradle.kts"), (".java",)),
+    LanguageSignal("go", ("go.mod",), (".go",)),
 )
 
 

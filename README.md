@@ -70,7 +70,7 @@ answers "why is this run not reporting anything?".
 Setup is four steps. A run that reports nothing is almost always a skipped one:
 
 1. **Install habit-hooks** — you get the core and the generic, language-agnostic plugin.
-2. **Install the plugin for your language** — python, typescript, php and java ship as separate packages.
+2. **Install the plugin for your language** — python, typescript, php, java and go ship as separate packages.
 3. **Enable the plugins** by naming them in `.habit-hooks/config.toml`. Installing one does not switch it on.
 4. **Install the detectors** the plugins you enabled use — `jscpd`, `ruff`, `eslint` and friends.
 
@@ -92,20 +92,20 @@ brew install habit-hooks/tap/habit-hooks
 ```
 
 You get **core plus the generic plugin**, and four commands on your `PATH`: `habit-hooks`, `habit-sensors`,
-`habit-mapper`, `habit-snooze`. Homebrew is the exception — it installs all five plugins, so skip to step 3.
+`habit-mapper`, `habit-snooze`. Homebrew is the exception — it installs all six plugins, so skip to step 3.
 
 > ⚠️ **On its own this checks nothing about your language.** The generic plugin measures file length and
-> duplication. Python, TypeScript, PHP and Java each need their own plugin — installed (step 2) *and*
+> duplication. Python, TypeScript, PHP, Java and Go each need their own plugin — installed (step 2) *and*
 > enabled (step 3).
 
 ### 2. Install the plugin for your language
 
-The four language plugins are **opt-in** via extras:
+The five language plugins are **opt-in** via extras:
 
 ```sh
 uv tool install "habit-hooks[typescript]"          # one language
 uv tool install "habit-hooks[python,typescript]"   # several — name them in one command
-uv tool install "habit-hooks[all]"                 # all four
+uv tool install "habit-hooks[all]"                 # all five
 ```
 
 > ⚠️ Each `uv tool install` **rebuilds** the environment rather than adding to it, so a second one naming a
@@ -146,6 +146,7 @@ Detectors are **not** bundled: a plugin spawns the real tool, or reads it as a l
 | **typescript** | `node`, [`eslint`](https://eslint.org/), [`knip`](https://knip.dev/), [`ts-morph`](https://ts-morph.com/) | `npm install --save-dev eslint knip ts-morph` (`node` from your system package manager) |
 | **php** | `php` — [phpmd](https://phpmd.org/) ships bundled as a phar | nothing beyond a PHP runtime |
 | **java** | [`pmd`](https://pmd.github.io/) | `brew install pmd` |
+| **go** | [`golangci-lint`](https://golangci-lint.run/) | `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest` |
 
 `ts-morph` is read as a library rather than spawned, so it belongs in your `devDependencies` — being on `PATH`
 does nothing for it.
@@ -321,7 +322,7 @@ Everything language- or tool-specific lives in a **plugin** — a self-contained
   guides/          # how it coaches each fix
 ```
 
-The five that ship:
+The six that ship:
 
 | Plugin | Language | Sensors | Tools used |
 |--------|----------|---------|------------|
@@ -330,6 +331,7 @@ The five that ship:
 | `typescript` | `typescript` | `eslint`, `knip`, `comment` | eslint, knip, ts-morph |
 | `php` | `php` | `phpmd` | phpmd |
 | `java` | `java` | `pmd` | pmd |
+| `go` | `go` | `golangci-lint` | golangci-lint |
 
 A project turns plugins on by listing them in `.habit-hooks/config.toml`. **That list is ordered, and the
 order is a priority:**
