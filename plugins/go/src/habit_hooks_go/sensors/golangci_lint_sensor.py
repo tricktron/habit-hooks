@@ -12,19 +12,20 @@ golangci-lint v2 cannot typecheck individual files from different directories
 directories of the file list are passed instead — only packages with changed
 files are linted, preserving the scoping habit-hooks narrows to.
 
-golangci-lint's cache keys on content, not paths: a cache hit from a previous
-run in a different directory returns ``Pos.Filename`` values pointing there, so
-each run gets a fresh cache dir via ``GOLANGCI_LINT_CACHE_DIR``.
+golangci-lint's cache keys on content, not paths: a cache hit from a different
+project returns ``Pos.Filename`` values pointing there. ``GOLANGCI_LINT_CACHE``
+is scoped to a per-project directory (keyed by cwd) so the cache stays warm
+within a project while isolating it from every other.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 from tool_spawn import run_tool
@@ -48,6 +49,23 @@ SMELL_BY_LINTER = {
 # -9 = killed) is golangci-lint never having produced a real report, mirroring
 # ruff_sensor.TOOL_EXIT_CODES.
 TOOL_EXIT_CODES = (0, 1)
+
+
+def _cache_dir() -> str:
+    """A cache dir scoped to this project, so cross-project cache hits cannot
+    return paths from another checkout.
+
+    golangci-lint's cache keys on content + relative path, not absolute paths,
+    so identical files at the same relative path in different projects share a
+    cache entry — and the cached ``Pos.Filename`` points to whichever project
+    was analysed first. A per-project cache dir (keyed by cwd hash) keeps the
+    cache warm within a project (same relative paths → valid hits) while
+    isolating it from every other project's checkout.
+    """
+    digest = hashlib.sha256(str(Path.cwd().resolve()).encode()).hexdigest()[:16]
+    cache = Path.home() / ".cache" / "golangci-lint" / digest
+    cache.mkdir(parents=True, exist_ok=True)
+    return str(cache)
 
 
 def split_argv(argv: list[str]) -> tuple[list[str], list[str]]:
@@ -118,13 +136,13 @@ def run_golangci_lint(
     files are linted (the scoping habit-hooks narrows to), and golangci-lint
     typechecks each package independently.
 
-    golangci-lint's cache keys on content, not paths: a cache hit from a
-    previous run in a different directory returns stale ``Pos.Filename``
-    values pointing there. v2 has no config or flag to disable caching, so
-    ``GOLANGCI_LINT_CACHE`` is pointed at a fresh temp dir each run —
-    effectively no cache, but the only way to keep paths honest. The cost
-    is re-analysis on every run; the alternative is silently dropped
-    findings (a false-clean).
+    golangci-lint's cache keys on content + relative path, not absolute paths:
+    identical files at the same relative path in different projects share a
+    cache entry, and the cached ``Pos.Filename`` points to the wrong project.
+    ``GOLANGCI_LINT_CACHE`` is scoped to a per-project directory (keyed by
+    cwd hash) so the cache stays warm within a project while isolating it
+    from every other — the default shared cache is the source of the
+    stale-path false-clean.
     """
     dirs = sorted({str(Path(f).parent) for f in files})
     command = [
@@ -145,14 +163,13 @@ def run_golangci_lint(
         # multiple directory paths and typechecks each package independently.
         *dirs,
     ]
-    with tempfile.TemporaryDirectory(prefix="golangci-lint-cache-") as cache_dir:
-        os.environ["GOLANGCI_LINT_CACHE"] = cache_dir
-        try:
-            return run_tool(command)
-        except FileNotFoundError:
-            return subprocess.CompletedProcess(
-                command, 127, "", "golangci-lint: command not found\n"
-            )
+    os.environ["GOLANGCI_LINT_CACHE"] = _cache_dir()
+    try:
+        return run_tool(command)
+    except FileNotFoundError:
+        return subprocess.CompletedProcess(
+            command, 127, "", "golangci-lint: command not found\n"
+        )
 
 
 def golangci_lint_crashed(result: subprocess.CompletedProcess[str]) -> bool:
