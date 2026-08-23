@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slice 01 — Go Plugin Sensor</title>
+<style>
+  :root {
+    --ink: #3a3328;
+    --muted: #7a7064;
+    --bg: #faf7f2;
+    --card: #ffffff;
+    --line: #e3ddd3;
+    --accent: #b8462a;
+    --accent-soft: #f4e8e2;
+    --code-bg: #f5f2ed;
+    --green: #5a7a4a;
+    --green-soft: #eef4ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e8e2d8;
+      --muted: #a89e90;
+      --bg: #1e1b17;
+      --card: #2a2620;
+      --line: #3d3830;
+      --accent: #d4634a;
+      --accent-soft: #3a2820;
+      --code-bg: #1a1814;
+      --green: #8ab576;
+      --green-soft: #2a3325;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 28px 80px; }
+  a { color: var(--accent); }
+
+  h1, h2, h3, h4 {
+    font-family: Georgia, "Times New Roman", serif;
+    letter-spacing: -0.01em;
+  }
+  h1 { font-size: 2rem; margin: 0 0 4px; }
+  h2 { font-size: 1.4rem; margin: 36px 0 14px; }
+  h3 { font-size: 1.12rem; margin: 24px 0 8px; }
+  h4 { font-size: 1rem; margin: 18px 0 6px; }
+  p { margin: 0 0 12px; }
+  .subtitle { color: var(--muted); font-size: 1rem; margin: 0 0 8px; }
+  .meta { color: var(--muted); font-size: 0.85rem; margin: 0 0 32px; }
+
+  code, pre {
+    font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Code", monospace;
+  }
+  code {
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 13.5px;
+    line-height: 1.5;
+    margin: 0 0 14px;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 0 0 20px;
+  }
+  .card h3 { margin-top: 0; }
+  .card.accent { border-left: 4px solid var(--accent); }
+  .card.green { border-left: 4px solid var(--green); }
+
+  ul, ol { padding-left: 1.2em; margin: 0 0 14px; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--accent); }
+
+  table { border-collapse: collapse; width: 100%; margin: 0 0 14px; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td code { font-size: 0.85em; }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .tag.pure { background: var(--green-soft); color: var(--green); }
+  .tag.real { background: var(--accent-soft); color: var(--accent); }
+  .tag.miss { background: var(--code-bg); color: var(--muted); }
+  .tag.cfg  { background: var(--accent-soft); color: var(--accent); }
+  .tag.vend { background: var(--green-soft); color: var(--green); }
+
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding-left: 26px; position: relative; margin-bottom: 8px; }
+  .checklist li::before {
+    content: "\2610";
+    position: absolute;
+    left: 0;
+    font-size: 1.1rem;
+    color: var(--muted);
+  }
+  .checklist li.done::before { content: "\2611"; color: var(--green); }
+
+  .lesson {
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 0 0 16px;
+  }
+  .lesson p:last-child { margin-bottom: 0; }
+
+  hr { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+
+  .file-tree {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Go Plugin Sensor</h1>
+<p class="subtitle">golangci-lint findings mapped to coaching smells</p>
+<p class="meta">Slice 01 &middot; TDD workflow &middot; revised after first failed attempt</p>
+
+<!-- ================================================================ -->
+<h2>User Story</h2>
+<!-- ================================================================ -->
+
+<p>A Go developer enables <code>habit-hooks-go</code> and runs
+<code>habit-hooks --all</code> against their project. golangci-lint findings
+are translated into coaching smell blocks they can act on. Unmapped linter
+rules are dropped silently, not forwarded raw. A missing golangci-lint
+answers in one line, not a traceback.</p>
+
+<!-- ================================================================ -->
+<h2>Outer Boundary</h2>
+<!-- ================================================================ -->
+
+<div class="card accent">
+<h3>What this slice touches</h3>
+<ul>
+  <li><strong>Plugin package</strong>: <code>habit-hooks-go</code> (entry point <code>habit_hooks.plugins &rarr; go</code>)</li>
+  <li><strong>Test surface</strong>: <code>plugins/go/tests/</code> with <code>conftest.py</code> putting <code>sensors/</code> on <code>sys.path</code></li>
+  <li><strong>Runner</strong>: <code>python -m pytest</code> (pyproject.toml created early for <code>uv run pytest</code>)</li>
+  <li><strong>No core changes</strong>: all five target smells (<code>high-complexity</code>, <code>oversized-function</code>, <code>unused-variable</code>, <code>unused-import</code>, <code>parse-error</code>) already have catalogue entries and guides in the generic plugin</li>
+</ul>
+</div>
+
+<!-- ================================================================ -->
+<h2>Shell Boundaries</h2>
+<!-- ================================================================ -->
+
+<div class="card">
+<h3>CLI</h3>
+<p>Sensor helper: <code>golangci_lint_sensor.py</code> <span class="tag pure">underscore</span></p>
+<p>The filename <strong>must</strong> use an underscore, not a hyphen. Python
+cannot import <code>golangci-lint_sensor.py</code> as a module —
+<code>conftest.py</code> puts <code>sensors/</code> on <code>sys.path</code>
+and imports <code>from golangci_lint_sensor import main</code>. Every sibling
+sensor uses underscore (<code>ruff_sensor.py</code>,
+<code>pmd_sensor.py</code>).</p>
+
+<h3>Filesystem</h3>
+<p>Bundled fallback config: <code>.golangci.yml</code> stripped from
+<a href="https://github.com/maratori/golangci-lint-config">maratori/golangci-lint-config</a>.
+The sensor passes <code>--config ${dir}/.golangci.yml</code> only when the
+project has no config of its own — a project's own config always wins.</p>
+</div>
+
+<!-- ================================================================ -->
+<h2>Functional Core</h2>
+<!-- ================================================================ -->
+
+<p>The sensor helper is a loose script (<code>${python} ${dir}/golangci_lint_sensor.py</code>),
+so its own directory is <code>sys.path[0]</code> and neighbours are plain
+top-level imports — <code>from tool_spawn import run_tool</code>, never a
+package-relative import.</p>
+
+<h3>Pipeline</h3>
+<ol>
+  <li><strong>Split argv</strong>: everything after <code>--</code> is the file list</li>
+  <li><strong>Config check</strong>: does the project have its own <code>.golangci.yml</code> / <code>.golangci.yaml</code> / <code>golangci.yml</code>? If yes, pass nothing. If no, pass <code>--config ${dir}/.golangci.yml</code></li>
+  <li><strong>Run golangci-lint</strong> via <code>tool_spawn.run_tool</code> (byte-identical copy of the other four Python plugins' <code>tool_spawn.py</code>)</li>
+  <li><strong>Parse JSON</strong>: <code>json.loads(stdout)</code> — each entry is one issue</li>
+  <li><strong>Map via routing table</strong>: <code>linter</code> + <code>text</code> prefix &rarr; smell</li>
+  <li><strong>Group by smell</strong>, sort alphabetically (same as ruff's <code>findings()</code>)</li>
+  <li><strong>Emit</strong>: <code>json.dumps(findings)</code> on stdout, exit 0</li>
+</ol>
+
+<h3>Smell routing table</h3>
+<table>
+  <thead>
+    <tr><th>linter</th><th>text prefix</th><th>smell</th><th>action</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>gocyclo</code></td><td>(any)</td><td><code>high-complexity</code></td><td>forward</td></tr>
+    <tr><td><code>funlen</code></td><td>(any)</td><td><code>oversized-function</code></td><td>forward</td></tr>
+    <tr><td><code>ineffassign</code></td><td>(any)</td><td><code>unused-variable</code></td><td>forward</td></tr>
+    <tr><td><code>unused</code></td><td><code>"var&nbsp;"</code></td><td><code>unused-variable</code></td><td>forward</td></tr>
+    <tr><td><code>unused</code></td><td>(other)</td><td>&mdash;</td><td><strong>drop</strong></td></tr>
+    <tr><td><code>typecheck</code></td><td><code>"imported and not used"</code></td><td><code>unused-import</code></td><td>forward</td></tr>
+    <tr><td><code>typecheck</code></td><td>(other)</td><td><code>parse-error</code></td><td>forward</td></tr>
+  </tbody>
+</table>
+<p>Unmapped linters are dropped — the same "a sensor emits vocabulary smells
+only" rule ruff and knip follow. A key nobody catalogued has no guide and no
+severity, so forwarding it can only fail a run and decline to explain why.</p>
+
+<!-- ================================================================ -->
+<h2>Acceptance Criterion</h2>
+<!-- ================================================================ -->
+
+<div class="card accent">
+<h3>Given-When-Then</h3>
+<p><strong>Given</strong> a Go project with <code>go.mod</code> and a function
+whose cyclomatic complexity exceeds golangci-lint's threshold,</p>
+<p><strong>When</strong> <code>habit-hooks --all</code> runs,</p>
+<p><strong>Then</strong> the output contains a <code>high-complexity</code>
+coaching block with the file path and line number,</p>
+<p><strong>And</strong> unmapped findings (e.g. <code>unused</code> on a
+non-variable) do not appear in the output at all.</p>
+</div>
+
+<!-- ================================================================ -->
+<h2>Test List</h2>
+<!-- ================================================================ -->
+
+<p>The codebase has exactly <strong>three</strong> test strategies. Stubbing
+an internal <code>run_tool</code> function is <strong>not</strong> one of them
+and was the primary mistake in the first attempt.</p>
+
+<div class="lesson">
+<p><strong>Lesson: no <code>run_tool</code> stubbing.</strong> No test anywhere
+in the codebase (95 test files across all plugins) stubs an internal function.
+The <code>main()</code> orchestration (run tool &rarr; parse &rarr; map &rarr;
+emit) is implicitly tested by real-tool tests that spawn the sensor as a
+subprocess. Pure logic is tested by calling <code>findings()</code>,
+<code>issues()</code>, or <code>golangci_lint_crashed()</code> directly with
+synthetic data dicts — no tool involved.</p>
+</div>
+
+<h3>Pure function tests <span class="tag pure">synthetic data</span></h3>
+<p>File: <code>test_the_golangci_lint_pipeline_maps_findings_to_smells.py</code></p>
+<p>Calls <code>findings(entries)</code> with hand-built golangci-lint-JSON-shaped
+dicts. No tool involved. Mirrors ruff's
+<code>test_the_ruff_pipeline_maps_codes_to_smells.py</code>.</p>
+
+<ul>
+  <li>Zero issues &rarr; <code>findings([])</code> returns <code>[]</code> &mdash; <strong>walking skeleton</strong></li>
+  <li>Simple linter routing (parametrized): <code>gocyclo</code>&rarr;<code>high-complexity</code>, <code>funlen</code>&rarr;<code>oversized-function</code>, <code>ineffassign</code>&rarr;<code>unused-variable</code></li>
+  <li><code>unused</code> with <code>"var "</code> prefix &rarr; <code>unused-variable</code></li>
+  <li><code>unused</code> with <code>"func "</code> prefix &rarr; dropped</li>
+  <li><code>typecheck</code> with <code>"imported and not used"</code> &rarr; <code>unused-import</code></li>
+  <li><code>typecheck</code> with other text &rarr; <code>parse-error</code></li>
+  <li>Multiple findings grouped by smell, sorted alphabetically</li>
+  <li>Exit code 0 and 1 trusted; 2/127 &rarr; crash (parametrized, pure <code>golangci_lint_crashed()</code>)</li>
+</ul>
+
+<h3>Real-tool tests <span class="tag real">subprocess + real golangci-lint</span></h3>
+<p>File: <code>test_the_golangci_lint_sensor_runs_the_real_tool.py</code></p>
+<p>Spawns the sensor via <code>subprocess.run([sys.executable, str(SENSOR), ...])</code>.
+Mirrors ruff's <code>test_the_ruff_sensor_runs_the_real_tool.py</code>.</p>
+
+<ul>
+  <li>Real tool on a clean file &rarr; <code>[]</code></li>
+  <li>Real tool on a file with violations &rarr; mapped smells in output</li>
+</ul>
+
+<h3>Crash test <span class="tag pure">pure function</span></h3>
+<p>File: <code>test_a_crashing_golangci_lint_fails_the_run.py</code></p>
+<p>Exercises <code>golangci_lint_crashed()</code> directly with synthetic
+<code>CompletedProcess</code> objects. Mirrors ruff's
+<code>test_a_crashing_ruff_fails_the_run.py</code>.</p>
+
+<ul>
+  <li>Exit 0 and 1 &rarr; <code>False</code> (parametrized)</li>
+  <li>Exit 2, 127, -9 &rarr; <code>True</code> (parametrized)</li>
+</ul>
+
+<h3>Missing-tool test <span class="tag miss">universal pattern</span></h3>
+<p>File: <code>test_a_golangci_lint_nobody_installed_is_named.py</code></p>
+<p><code>env={"PATH": "/nonexistent"}</code>, assert
+<code>"golangci-lint: command not found"</code>. Mirrors ruff's
+<code>test_a_ruff_nobody_installed_is_named.py</code>. Universal across all
+plugins.</p>
+
+<ul>
+  <li>Missing tool (<code>PATH=/nonexistent</code>) &rarr; exit 2, <code>"golangci-lint: command not found"</code></li>
+</ul>
+
+<h3>Config tests <span class="tag cfg">filesystem</span></h3>
+<p>File: <code>test_the_go_files_leave_vendor_alone.py</code></p>
+
+<ul>
+  <li>Project with own <code>.golangci.yml</code> &rarr; sensor does not pass <code>--config</code></li>
+  <li>Project without config &rarr; sensor passes <code>--config ${dir}/.golangci.yml</code></li>
+</ul>
+
+<h3>Vendored test <span class="tag vend">python -S gate</span></h3>
+<p>File: <code>test_a_vendored_sensor_finds_its_neighbour.py</code></p>
+<p>Copies sensor files into <code>.habit-hooks/go/sensors/</code>, runs with
+<code>python -S</code> to deny site-packages. The sensor imports
+<code>tool_spawn</code> from beside itself — must resolve without the package
+installed. Mirrors java's
+<code>test_a_vendored_sensor_finds_its_neighbour.py</code>.</p>
+
+<ul>
+  <li>Vendored sensor finds its neighbour (<code>tool_spawn</code>) &mdash; <code>python -S</code> gate</li>
+</ul>
+
+<!-- ================================================================ -->
+<h2>Test Conventions</h2>
+<!-- ================================================================ -->
+
+<div class="card">
+<ul>
+  <li><strong>Bare asserts</strong> — no custom messages. Universal across 95 test files.</li>
+  <li><strong>Module docstring</strong> carries the "why". No inline comments in test body.</li>
+  <li><strong><code>_</code>-prefixed helper builders</strong> for setup data (like ruff's <code>_entry()</code>)</li>
+  <li><strong>Descriptive function names</strong> are the spec — <code>test_zero_issues_is_no_findings</code>, not <code>test_01</code></li>
+  <li><strong>Parameter named <code>entries</code></strong>, not <code>issues</code> &mdash; avoids shadowing the module-level <code>issues()</code> function</li>
+</ul>
+</div>
+
+<!-- ================================================================ -->
+<h2>Files to Create</h2>
+<!-- ================================================================ -->
+
+<div class="card">
+<div class="file-tree">plugins/go/
+  pyproject.toml                                    # entry point, dependencies=[], hatchling
+  src/habit_hooks_go/
+    __init__.py
+    config.toml                                     # language, files, sensors, detectors
+    .golangci.yml                                   # bundled fallback (stripped from maratori)
+    sensors/
+      golangci-lint.toml                            # argv spec (underscore filename)
+      golangci_lint_sensor.py                       # helper script (UNDERSCORE)
+      tool_spawn.py                                 # byte-identical copy
+  tests/
+    conftest.py                                     # sys.path for loose-script imports
+    test_the_golangci_lint_pipeline_maps_findings_to_smells.py
+    test_the_golangci_lint_sensor_runs_the_real_tool.py
+    test_a_crashing_golangci_lint_fails_the_run.py
+    test_a_golangci_lint_nobody_installed_is_named.py
+    test_a_vendored_sensor_finds_its_neighbour.py
+    test_the_go_files_leave_vendor_alone.py</div>
+</div>
+
+<h3>Sensor spec</h3>
+<pre><code># sensors/golangci-lint.toml
+argv = ["${python}", "${dir}/golangci_lint_sensor.py", "${args}", "--", "${files}"]</code></pre>
+<p>Note the underscore in <code>golangci_lint_sensor.py</code> — must match
+the actual filename. The <code>${args}</code> placeholder is where
+<code>--config</code> (or nothing) is expanded.</p>
+
+<h3>pyproject.toml</h3>
+<p><code>plugins/go/</code> matches the <code>plugins/*</code> workspace glob,
+so it needs a <code>pyproject.toml</code> for <code>uv run pytest</code> to
+work. Tests can be run with plain <code>python -m pytest</code> in the
+meantime, but the pyproject.toml should be created early.</p>
+
+<pre><code>[project]
+name = "habit-hooks-go"
+version = "1.4.0rc1"
+description = "The Go Habit Hooks plugin"
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.entry-points."habit_hooks.plugins"]
+go = "habit_hooks_go"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/habit_hooks_go"]</code></pre>
+
+<!-- ================================================================ -->
+<h2>Decision Context</h2>
+<!-- ================================================================ -->
+
+<div class="card accent">
+<h3>Why these choices</h3>
+
+<h4>Underscore filename</h4>
+<p><code>golangci_lint_sensor.py</code>, not <code>golangci-lint_sensor.py</code>.
+Python cannot import a hyphenated filename. The conftest puts
+<code>sensors/</code> on <code>sys.path</code> and imports
+<code>from golangci_lint_sensor import main</code>. Every sibling sensor uses
+underscore. The sensor spec toml must spell the same filename.</p>
+
+<h4>Three test strategies, not four</h4>
+<p>Pure function tests (synthetic dicts), real-tool tests (subprocess), and
+missing-tool tests (<code>PATH=/nonexistent</code>). There is no "stub the
+internal <code>run_tool</code> and test <code>main()</code>" strategy
+anywhere in the codebase. The <code>main()</code> orchestration is implicitly
+tested by real-tool tests that spawn the sensor as a subprocess.</p>
+
+<h4>Walking skeleton is <code>findings([])</code></h4>
+<p>The first test is <code>test_zero_issues_is_no_findings</code> calling
+<code>findings([])</code> directly — not a <code>main()</code> orchestration
+test with a stubbed <code>run_tool</code>. This is how ruff's
+<code>test_zero_entries_is_no_findings</code> works.</p>
+
+<h4>Routing by <code>linter</code> + <code>text</code> prefix</h4>
+<p>golangci-lint's JSON gives <code>linter</code> and <code>text</code> per
+issue. <code>unused</code> and <code>typecheck</code> are ambiguous without
+the text: <code>unused</code> with <code>"var "</code> is
+<code>unused-variable</code>, with <code>"func "</code> it is dropped;
+<code>typecheck</code> with <code>"imported and not used"</code> is
+<code>unused-import</code>, otherwise <code>parse-error</code>. The other
+three (<code>gocyclo</code>, <code>funlen</code>, <code>ineffassign</code>)
+map unambiguously.</p>
+
+<h4><code>tool_spawn.py</code> is a byte-identical copy</h4>
+<p>Every Python plugin (generic, java, php, python) ships its own copy. None
+may import <code>habit-hooks</code> or each other (<code>dependencies = []</code>),
+so a helper cannot reach a shared implementation. The gate
+<code>test_every_plugin_carries_the_same_copy</code> keeps them from drifting.</p>
+
+<h4>All five target smells already exist</h4>
+<p><code>high-complexity</code>, <code>oversized-function</code>,
+<code>unused-variable</code>, <code>unused-import</code>, and
+<code>parse-error</code> all have catalogue entries (enforced) and guides in
+the generic plugin. No new smells, no new guides, no core changes.</p>
+
+<h4>Bundled config from maratori</h4>
+<p>Stripped from <a href="https://github.com/maratori/golangci-lint-config">maratori/golangci-lint-config</a>
+— enables only the linters this plugin maps. A project's own
+<code>.golangci.yml</code> always wins; the bundled one is the fallback for
+"this project has none."</p>
+</div>
+
+<!-- ================================================================ -->
+<h2>Open Questions</h2>
+<!-- ================================================================ -->
+
+<p>None. All decisions resolved after the first failed attempt.</p>
+
+<!-- ================================================================ -->
+<h2>Uses</h2>
+<!-- ================================================================ -->
+
+<div class="card green">
+<ul>
+  <li><strong><code>tool_spawn.py</code></strong> — byte-identical copy (from python/java/php/generic plugins)</li>
+  <li><strong><code>catalogue.py</code></strong> — existing enforced smells (no changes)</li>
+  <li><strong>Generic plugin guides</strong> — <code>high-complexity.md</code>, <code>oversized-function.md</code>, <code>unused-variable.md</code>, <code>unused-import.md</code>, <code>parse-error.md</code> (all existing)</li>
+  <li><strong>maratori/golangci-lint-config</strong> — bundled fallback <code>.golangci.yml</code> (stripped)</li>
+</ul>
+</div>
+
+</div>
+</body>
+</html>
