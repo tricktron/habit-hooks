@@ -82,7 +82,7 @@ def golangci_lint_crashed(result: subprocess.CompletedProcess[str]) -> bool:
     return result.returncode not in TOOL_EXIT_CODES
 
 
-def violations(result: subprocess.CompletedProcess[str]) -> list[dict]:
+def issues(result: subprocess.CompletedProcess[str]) -> list[dict]:
     """golangci-lint v2 wraps its issues: ``{"Issues": [...], "Report": {...}}``."""
     text = result.stdout.strip()
     return json.loads(text).get("Issues", []) if text else []
@@ -129,14 +129,13 @@ def findings(entries: list[dict]) -> list[dict]:
 
 
 def main() -> int:
-    files = sys.argv[1:]
-    if "--" in sys.argv[1:]:
-        files = sys.argv[sys.argv.index("--") + 1 :]
+    args = sys.argv[1:]
+    files = args[args.index("--") + 1 :] if "--" in args else args
     result = run_golangci_lint(files)
     if golangci_lint_crashed(result):
         sys.stderr.write(result.stderr)
         return 2
-    print(json.dumps(findings(violations(result))))
+    print(json.dumps(findings(issues(result))))
     return 0
 
 
