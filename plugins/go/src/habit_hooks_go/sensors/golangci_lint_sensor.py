@@ -29,15 +29,6 @@ SMELL_BY_LINTER = {
     "ineffassign": "unused-variable",
 }
 
-# Linters forwarded as uncoached: their findings surface through the generic
-# ``uncoached.md`` guide (suggested severity), so a real defect is never
-# silently dropped. Each message is specific and self-coaching ("Error return
-# value of `os.Open` is not checked"), so no catalogue smell or guide is needed
-# — the linter already did the coaching. A project escalates with
-# ``uncoached = "enforce"`` or ``[smells.<linter>] severity = "enforced"``.
-UNCOACHED_LINTERS = ("errcheck", "govet", "staticcheck")
-
-
 def split_argv(argv: list[str]) -> tuple[list[str], list[str]]:
     """``argv``, split on the last literal ``--``: the project's args before it,
     the files to analyse after.
@@ -59,9 +50,14 @@ def smell_of(linter: str, text: str) -> str | None:
         return "unused-variable" if text.startswith("var ") else None
     if linter == "typecheck":
         return "unused-import" if "imported and not used" in text else "parse-error"
-    if linter in UNCOACHED_LINTERS:
-        return linter
-    return None
+    # Any linter a project enabled that this plugin has no catalogue smell for
+    # is forwarded under the linter's own name, surfacing through
+    # ``uncoached.md`` (suggested severity). The message is specific and
+    # self-coaching, so no guide is needed. A project escalates with
+    # ``uncoached = "enforce"`` or ``[smells.<linter>] severity = "enforced"``.
+    # The only deliberate drop is ``unused`` without ``var `` — an unused
+    # function/type has no catalogue smell and forwarding it would be noise.
+    return linter
 
 
 def issue(entry: dict, base: Path) -> dict:
