@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 members = [
     "habit-hooks",
     "habit-hooks-generic",
+    "habit-hooks-go",
     "habit-hooks-java",
     "habit-hooks-php",
     "habit-hooks-python",
@@ -85,10 +86,14 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
+    { name = "habit-hooks-go" },
     { name = "habit-hooks-java" },
     { name = "habit-hooks-php" },
     { name = "habit-hooks-python" },
     { name = "habit-hooks-typescript" },
+]
+go = [
+    { name = "habit-hooks-go" },
 ]
 java = [
     { name = "habit-hooks-java" },
@@ -107,6 +112,7 @@ typescript = [
 dev = [
     { name = "deptry" },
     { name = "habit-hooks-generic" },
+    { name = "habit-hooks-go" },
     { name = "habit-hooks-java" },
     { name = "habit-hooks-php" },
     { name = "habit-hooks-python" },
@@ -121,6 +127,8 @@ dev = [
 requires-dist = [
     { name = "attrs", specifier = ">=23" },
     { name = "habit-hooks-generic", editable = "plugins/generic" },
+    { name = "habit-hooks-go", marker = "extra == 'all'", editable = "plugins/go" },
+    { name = "habit-hooks-go", marker = "extra == 'go'", editable = "plugins/go" },
     { name = "habit-hooks-java", marker = "extra == 'all'", editable = "plugins/java" },
     { name = "habit-hooks-java", marker = "extra == 'java'", editable = "plugins/java" },
     { name = "habit-hooks-php", marker = "extra == 'all'", editable = "plugins/php" },
@@ -132,12 +140,13 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3" },
     { name = "pathspec", specifier = ">=0.12" },
 ]
-provides-extras = ["python", "typescript", "php", "java", "all"]
+provides-extras = ["python", "typescript", "php", "java", "go", "all"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "deptry", specifier = ">=0.25.1" },
     { name = "habit-hooks-generic", editable = "plugins/generic" },
+    { name = "habit-hooks-go", editable = "plugins/go" },
     { name = "habit-hooks-java", editable = "plugins/java" },
     { name = "habit-hooks-php", editable = "plugins/php" },
     { name = "habit-hooks-python", editable = "plugins/python" },
@@ -152,6 +161,11 @@ dev = [
 name = "habit-hooks-generic"
 version = "1.4.0rc1"
 source = { editable = "plugins/generic" }
+
+[[package]]
+name = "habit-hooks-go"
+version = "1.4.0rc1"
+source = { editable = "plugins/go" }
 
 [[package]]
 name = "habit-hooks-java"

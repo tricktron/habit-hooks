@@ -41,3 +41,20 @@ def test_every_mapped_linter_reaches_its_own_smell(linter: str) -> None:
 
     assert [finding["smell"] for finding in result] == [SMELL_BY_LINTER[linter]]
     assert result[0]["issues"][0]["details"]["source"] == f"golangci-lint:{linter}"
+
+
+def test_unused_with_var_prefix_is_unused_variable() -> None:
+    entry = _entry("unused")
+    entry["Text"] = "var x is unused"
+
+    result = findings([entry])
+
+    assert [finding["smell"] for finding in result] == ["unused-variable"]
+    assert result[0]["issues"][0]["details"]["source"] == "golangci-lint:unused"
+
+
+def test_unused_with_func_prefix_is_dropped() -> None:
+    entry = _entry("unused")
+    entry["Text"] = "func foo is unused"
+
+    assert findings([entry]) == []

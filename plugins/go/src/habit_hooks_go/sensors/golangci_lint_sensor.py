@@ -17,6 +17,14 @@ SMELL_BY_LINTER = {
 }
 
 
+def smell_of(linter: str, text: str) -> str | None:
+    if linter in SMELL_BY_LINTER:
+        return SMELL_BY_LINTER[linter]
+    if linter == "unused" and text.startswith("var "):
+        return "unused-variable"
+    return None
+
+
 def issue(entry: dict) -> dict:
     return {
         "key": entry["Pos"]["Filename"],
@@ -33,7 +41,7 @@ def issue(entry: dict) -> dict:
 def findings(entries: list[dict]) -> list[dict]:
     by_smell: dict[str, list[dict]] = {}
     for entry in entries:
-        smell = SMELL_BY_LINTER.get(entry["FromLinter"])
+        smell = smell_of(entry["FromLinter"], entry["Text"])
         if smell is None:
             continue
         by_smell.setdefault(smell, []).append(entry)
