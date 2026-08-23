@@ -1,11 +1,18 @@
-# Bundled fallback — enables only linters this plugin maps.
+# Bundled fallback — enables only linters this plugin maps or forwards.
+# `default: none` disables golangci-lint v2's default linters, so `enable` is
+# the exhaustive set: anything not listed here cannot run, so an unmapped
+# linter can never produce a finding the sensor silently drops (false-clean).
 # Stripped from https://github.com/maratori/golangci-lint-config
 # v2 requires a `version: "2"` key up front or it refuses to load the config
 # ("" is "unsupported version").
 version: "2"
 linters:
+  default: none
   enable:
     - gocyclo
     - funlen
     - ineffassign
     - unused
+    - errcheck
+    - govet
+    - staticcheck

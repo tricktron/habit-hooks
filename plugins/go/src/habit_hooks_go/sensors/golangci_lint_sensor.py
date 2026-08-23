@@ -182,6 +182,15 @@ def issues(result: subprocess.CompletedProcess[str]) -> list[dict]:
     return json.loads(text).get("Issues", []) if text else []
 
 
+# Linters forwarded as uncoached: their findings surface through the generic
+# ``uncoached.md`` guide (suggested severity), so a real defect is never
+# silently dropped. Each message is specific and self-coaching ("Error return
+# value of `os.Open` is not checked"), so no catalogue smell or guide is needed
+# — the linter already did the coaching. A project escalates with
+# ``uncoached = "enforce"`` or ``[smells.<linter>] severity = "enforced"``.
+UNCOACHED_LINTERS = ("errcheck", "govet", "staticcheck")
+
+
 def smell_of(linter: str, text: str) -> str | None:
     if linter in SMELL_BY_LINTER:
         return SMELL_BY_LINTER[linter]
@@ -189,6 +198,8 @@ def smell_of(linter: str, text: str) -> str | None:
         return "unused-variable" if text.startswith("var ") else None
     if linter == "typecheck":
         return "unused-import" if "imported and not used" in text else "parse-error"
+    if linter in UNCOACHED_LINTERS:
+        return linter
     return None
 
 
@@ -207,6 +218,13 @@ def issue(entry: dict, base: Path) -> dict:
         match = re.search(r"(\d+):(\d+): ", entry["Text"])
         if match:
             line, column = int(match.group(1)), int(match.group(2))
+    # ``content`` carries the source line and the linter's message so the
+    # shared listing shows both: the offending code and what is wrong with it.
+    # ``content`` is what ``line_level_issues.md`` renders after ``file:line``,
+    # and no shipped sensor sets it — so without this, the listing is bare.
+    source_lines = entry.get("SourceLines")
+    source_line = source_lines[0].strip() if source_lines else ""
+    content = f"{source_line}: {entry['Text']}" if source_line else entry["Text"]
     return {
         "key": filename,
         "details": {
@@ -215,6 +233,7 @@ def issue(entry: dict, base: Path) -> dict:
             "column": column,
             "message": entry["Text"],
             "source": "golangci-lint:" + entry["FromLinter"],
+            "content": content,
         },
     }
 
