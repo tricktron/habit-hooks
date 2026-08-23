@@ -29,4 +29,6 @@ files = [
   "plugins/php/tests/**/*.py",
   "plugins/typescript/src/**/*.py",
   "plugins/typescript/tests/**/*.py",
+  "plugins/go/src/**/*.py",
+  "plugins/go/tests/**/*.py",
 ]
