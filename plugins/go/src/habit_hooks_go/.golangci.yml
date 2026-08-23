@@ -1,0 +1,10 @@
+# Bundled fallback — enables only linters this plugin maps.
+# Stripped from https://github.com/maratori/golangci-lint-config
+# STUB: minimal placeholder; the full config and golangci-lint v2 format are
+# sorted out during TDD.
+linters:
+  enable:
+    - gocyclo
+    - funlen
+    - ineffassign
+    - unused

@@ -1,0 +1,13 @@
+# Go plugin defaults.
+language = "go"
+# A project naming no `files` of its own scans what its plugins declare, so this
+# is the first run for anyone `habit-hooks init` set up. An installed dependency
+# is never the project's source, and `vendor/` is go modules' own vendored copy
+# of the dependencies — never the code being reviewed.
+files = ["**/*.go", "!**/vendor/**"]
+sensors = ["golangci-lint"]
+transformers = []
+
+detectors = [
+  { name = "golangci-lint", kind = "command", install = "go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest" },
+]

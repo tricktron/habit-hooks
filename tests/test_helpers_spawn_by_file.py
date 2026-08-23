@@ -8,8 +8,8 @@ further in, which is why ``sensors/tool_spawn.py`` sits beside each helper.
 
 It is a copy in each plugin because each plugin is a separately installable
 distribution declaring no dependency on ``habit-hooks``: a helper cannot import
-the core, and four copies beat a dependency that does not exist. What keeps four
-copies honest is the first case here — they are one file, byte for byte, so
+the core, and small copies beat a dependency that does not exist. What keeps the
+copiescopies honest is the first case here — they are one file, byte for byte, so
 whichever of them is exercised below answers for all of them.
 
 The lookup is not a second answer to the core's: habit-hooks hands a helper a
@@ -35,7 +35,7 @@ from platform_probe import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-PLUGINS = ("generic", "java", "php", "python")
+PLUGINS = ("generic", "go", "java", "php", "python")
 
 
 def _copy(plugin: str) -> Path:
@@ -46,7 +46,7 @@ def _copy(plugin: str) -> Path:
 def _loaded(plugin: str) -> ModuleType:
     """One plugin's copy, loaded the way its helper's own ``import`` loads it.
 
-    Under a name of its own: all four are called ``tool_spawn``, since each is
+    Under a name of its own: every copy is called ``tool_spawn``, since each is
     imported from beside the helper that uses it, and a shared suite must not
     have one of them shadow another in ``sys.modules``.
     """
@@ -59,7 +59,7 @@ def _loaded(plugin: str) -> ModuleType:
 
 @pytest.fixture
 def tool_spawn() -> ModuleType:
-    """The copy the cases below drive, standing for all four by sameness."""
+    """The copy the cases below drive, standing for all of them by sameness."""
     return _loaded("generic")
 
 

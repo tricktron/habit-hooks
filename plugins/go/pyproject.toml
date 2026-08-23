@@ -1,0 +1,51 @@
+[project]
+name = "habit-hooks-go"
+version = "1.4.0rc1"
+description = "The Go Habit Hooks plugin"
+readme = "README.md"
+license = "MIT"
+keywords = [
+    "code-quality",
+    "code-smells",
+    "static-analysis",
+    "linter",
+    "ci",
+    "code-review",
+    "technical-debt",
+    "refactoring",
+    "ai-coding-agents",
+    "coding-agents",
+    "developer-tools",
+    "go",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Utilities",
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.entry-points."habit_hooks.plugins"]
+go = "habit_hooks_go"
+
+[project.urls]
+Homepage = "https://habit-hooks.com"
+Repository = "https://github.com/habit-hooks/habit-hooks"
+Issues = "https://github.com/habit-hooks/habit-hooks/issues"
+Changelog = "https://github.com/habit-hooks/habit-hooks/blob/main/CHANGELOG.md"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/habit_hooks_go"]

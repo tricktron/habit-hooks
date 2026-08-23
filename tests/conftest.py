@@ -38,6 +38,7 @@ from wheelhouse import build_wheels, install_wheels
 SHIPPED_PACKAGES = (
     "habit-hooks",
     "habit-hooks-generic",
+    "habit-hooks-go",
     "habit-hooks-java",
     "habit-hooks-php",
     "habit-hooks-python",
