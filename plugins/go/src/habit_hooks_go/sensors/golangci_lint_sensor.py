@@ -11,6 +11,10 @@ from __future__ import annotations
 import sys
 
 
+def findings(entries: list[dict]) -> list[dict]:
+    return []
+
+
 def main() -> int:
     # STUB: not yet implemented. Exits 2 (a crash, not a clean run) so the
     # acceptance test fails on its expected output, never on an import error.
