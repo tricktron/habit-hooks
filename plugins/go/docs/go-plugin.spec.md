@@ -435,3 +435,43 @@ habit-sensors --all
 ```json
 []
 ```
+
+## An unchecked error is flagged
+
+The bundled `.golangci.yml` enables `errcheck`, which reports a call whose error
+return is discarded. Calling `os.Open("nonexistent")` as a bare statement throws
+away **both** return values — the unchecked `error` is what the linter flags, and
+only a bare statement triggers it (`_ = os.Open(...)` is an explicit discard and
+would stay silent). The file otherwise compiles (so `typecheck` never speaks),
+`main` is used by the runtime (so `unused` never sees it), and the straight-line
+five-line body stays under `funlen`'s and `gocyclo`'s defaults — the discarded
+error is the one smell this file carries.
+
+The sensor maps `errcheck` → `unchecked-error` (`smell_of`), stamping
+`source: "golangci-lint:errcheck"` on the issue.
+
+📄main.go
+```go
+package main
+
+import "os"
+
+func main() {
+	os.Open("nonexistent")
+}
+```
+
+```bash
+habit-sensors --all | jq '.[] | {smell, language, key: (.issues[0].key | sub(".*/"; "")), line: .issues[0].details.line, source: .issues[0].details.source}'
+```
+
+🖥️ ✅
+```json
+{
+  "smell": "unchecked-error",
+  "language": "go",
+  "key": "main.go",
+  "line": 6,
+  "source": "golangci-lint:errcheck"
+}
+```
