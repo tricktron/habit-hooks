@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slice 02 — Go Smells Tier 1: unchecked-error + copied-lock</title>
+<style>
+  :root {
+    --ink: #3a3328;
+    --muted: #7a7064;
+    --bg: #faf7f2;
+    --card: #ffffff;
+    --line: #e3ddd3;
+    --accent: #b8462a;
+    --accent-soft: #f4e8e2;
+    --code-bg: #f5f2ed;
+    --green: #5a7a4a;
+    --green-soft: #eef4ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #e8e2d8;
+      --muted: #a89e90;
+      --bg: #1e1b17;
+      --card: #2a2620;
+      --line: #3d3830;
+      --accent: #d4634a;
+      --accent-soft: #3a2820;
+      --code-bg: #1a1814;
+      --green: #8ab576;
+      --green-soft: #2a3325;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 28px 80px; }
+  a { color: var(--accent); }
+
+  h1, h2, h3, h4 {
+    font-family: Georgia, "Times New Roman", serif;
+    letter-spacing: -0.01em;
+  }
+  h1 { font-size: 2rem; margin: 0 0 4px; }
+  h2 { font-size: 1.4rem; margin: 36px 0 14px; }
+  h3 { font-size: 1.12rem; margin: 24px 0 8px; }
+  h4 { font-size: 1rem; margin: 18px 0 6px; }
+  p { margin: 0 0 12px; }
+  .subtitle { color: var(--muted); font-size: 1rem; margin: 0 0 8px; }
+  .meta { color: var(--muted); font-size: 0.85rem; margin: 0 0 32px; }
+
+  code, pre {
+    font-family: ui-monospace, SFMono-Regular, Menlo, "Cascadia Code", monospace;
+  }
+  code {
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    font-size: 13.5px;
+    line-height: 1.5;
+    margin: 0 0 14px;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 0 0 20px;
+  }
+  .card h3 { margin-top: 0; }
+  .card.accent { border-left: 4px solid var(--accent); }
+  .card.green { border-left: 4px solid var(--green); }
+
+  ul, ol { padding-left: 1.2em; margin: 0 0 14px; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--accent); }
+
+  table { border-collapse: collapse; width: 100%; margin: 0 0 14px; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td code { font-size: 0.85em; }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .tag.new { background: var(--accent-soft); color: var(--accent); }
+  .tag.fix { background: var(--green-soft); color: var(--green); }
+  .tag.existing { background: var(--code-bg); color: var(--muted); }
+
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding-left: 26px; position: relative; margin-bottom: 8px; }
+  .checklist li::before {
+    content: "\2610";
+    position: absolute;
+    left: 0;
+    font-size: 1.1rem;
+    color: var(--muted);
+  }
+
+  .lesson {
+    background: var(--accent-soft);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 0 0 16px;
+  }
+  .lesson p:last-child { margin-bottom: 0; }
+
+  hr { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+
+  .file-tree {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Go Smells Tier 1: unchecked-error + copied-lock</h1>
+<p class="subtitle">Map errcheck and govet to dedicated Go smells with coaching grounded in learn-go-with-tests and Dave Cheney</p>
+<p class="meta">Slice 02 &middot; follows slice 01 (go plugin sensor) &middot; <code>/implement</code></p>
+
+<!-- ================================================================ -->
+<h2>User Story</h2>
+<!-- ================================================================ -->
+
+<p>As a Go developer running <code>habit-hooks --all</code>, I want
+<code>errcheck</code> and <code>govet</code> findings to be coached with
+Go-specific guidance — not the generic "ask yourself why the rule exists"
+prompt — so that I understand the Go-idiomatic hazard and the fix, without
+leaving the tool to research the linter.</p>
+
+<!-- ================================================================ -->
+<h2>Outer Boundary</h2>
+<!-- ================================================================ -->
+
+<div class="card accent">
+<h3>What this slice touches</h3>
+<ul>
+  <li><strong>Core catalogue</strong>: <code>src/habit_hooks/catalogue.py</code> — two new entries</li>
+  <li><strong>Go plugin sensor</strong>: <code>plugins/go/src/habit_hooks_go/sensors/golangci_lint_sensor.py</code> — add <code>errcheck</code> mapping + <code>govet</code> text routing</li>
+  <li><strong>Go plugin guides</strong>: <code>plugins/go/src/habit_hooks_go/guides/</code> — two new files (first Go-specific guides)</li>
+  <li><strong>Docs</strong>: <code>docs/smell-vocabulary.md</code> (fix Go section + add smells), <code>docs/guide-includes.spec.md</code> (add to include list)</li>
+  <li><strong>Spec</strong>: <code>plugins/go/docs/go-plugin.spec.md</code> — two new acceptance cases</li>
+  <li><strong>No new linters to enable</strong> — <code>errcheck</code> and <code>govet</code> are already in <code>.golangci.yml</code></li>
+</ul>
+</div>
+
+<!-- ================================================================ -->
+<h2>Shell Boundaries</h2>
+<!-- ================================================================ -->
+
+<div class="card">
+<h3>Guide resolution</h3>
+<p><code>rendering.plugins_for_language</code> (<code>rendering.py:82-95</code>) already
+puts the language-matching plugin first, so <code>go/guides/unchecked-error.md</code>
+wins over any generic fallback. No core code change needed — the infrastructure
+already supports plugin-specific guides per language. The
+<code>test_catalogue_coverage.py</code> gate asserts every catalogued smell
+resolves to a real guide, not <code>uncoached.md</code>.</p>
+
+<h3>Sensor mapping</h3>
+<p><code>errcheck</code> is unambiguous — all its findings are unchecked error
+returns — so it goes in <code>SMELL_BY_LINTER</code> directly.
+<code>govet</code> runs multiple analyzers (copylocks, printf, etc.), so it
+needs text-based routing like <code>unused</code> and <code>typecheck</code>:
+the copylocks analyzer's text contains "copies lock value" or "passes lock
+value"; other govet findings are forwarded as <code>govet</code> (uncoached).</p>
+</div>
+
+<!-- ================================================================ -->
+<h2>Functional Core</h2>
+<!-- ================================================================ -->
+
+<h3>Smell routing table (updated)</h3>
+<table>
+  <thead>
+    <tr><th>linter</th><th>text condition</th><th>smell</th><th>status</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>gocyclo</code></td><td>(any)</td><td><code>high-complexity</code></td><td><span class="tag existing">existing</span></td></tr>
+    <tr><td><code>funlen</code></td><td>(any)</td><td><code>oversized-function</code></td><td><span class="tag existing">existing</span></td></tr>
+    <tr><td><code>ineffassign</code></td><td>(any)</td><td><code>unused-variable</code></td><td><span class="tag existing">existing</span></td></tr>
+    <tr><td><code>errcheck</code></td><td>(any)</td><td><code>unchecked-error</code></td><td><span class="tag new">NEW</span></td></tr>
+    <tr><td><code>govet</code></td><td>contains <code>"copies lock value"</code> or <code>"passes lock value"</code></td><td><code>copied-lock</code></td><td><span class="tag new">NEW</span></td></tr>
+    <tr><td><code>govet</code></td><td>(other)</td><td><code>govet</code> (forwarded, uncoached)</td><td><span class="tag new">NEW</span></td></tr>
+    <tr><td><code>unused</code></td><td>starts with <code>"var&nbsp;"</code></td><td><code>unused-variable</code></td><td><span class="tag existing">existing</span></td></tr>
+    <tr><td><code>unused</code></td><td>(other)</td><td><code>unused</code> (forwarded, uncoached)</td><td><span class="tag fix">FIXED</span></td></tr>
+    <tr><td><code>typecheck</code></td><td>contains <code>"imported and not used"</code></td><td><code>unused-import</code></td><td><span class="tag existing">existing</span></td></tr>
+    <tr><td><code>typecheck</code></td><td>(other)</td><td><code>parse-error</code></td><td><span class="tag existing">existing</span></td></tr>
+  </tbody>
+</table>
+
+<div class="lesson">
+<p><strong>Docs drift fix (Imbalance 3).</strong> The current
+<code>smell-vocabulary.md</code> Go section says unmapped linters are "dropped"
+and the config "enables only four linters" — both false. The code forwards
+unmapped linters (<code>return linter</code> at line 58) and the config enables
+seven. This slice fixes the docs to match the forwarding design.</p>
+</div>
+
+<h3>Sensor code change</h3>
+<pre><code># SMELL_BY_LINTER — add errcheck (govet needs text routing, see below)
+SMELL_BY_LINTER = {
+    "gocyclo": "high-complexity",
+    "funlen": "oversized-function",
+    "ineffassign": "unused-variable",
+    "errcheck": "unchecked-error",          # NEW
+}
+
+def smell_of(linter: str, text: str) -> str | None:
+    if linter in SMELL_BY_LINTER:
+        return SMELL_BY_LINTER[linter]
+    if linter == "unused":
+        return "unused-variable" if text.startswith("var ") else linter
+    if linter == "typecheck":
+        return "unused-import" if "imported and not used" in text else "parse-error"
+    if linter == "govet":                   # NEW
+        if "copies lock value" in text or "passes lock value" in text:
+            return "copied-lock"
+        return "govet"                      # other govet analyzers: forwarded
+    return linter</code></pre>
+
+<h3>Catalogue entries</h3>
+<pre><code># catalogue.py DEFAULT_SEVERITY — add:
+"unchecked-error": ENFORCED,
+"copied-lock": ENFORCED,</code></pre>
+
+<!-- ================================================================ -->
+<h2>Guides</h2>
+<!-- ================================================================ -->
+
+<div class="card accent">
+<h3><code>plugins/go/src/habit_hooks_go/guides/unchecked-error.md</code> <span class="tag new">NEW</span></h3>
+<p>Incorporates Dave Cheney's <a href="https://dave.cheney.net/2016/04/27/dont-just-check-errors-handle-them-gracefully">"Don't just check errors, handle them gracefully"</a>
+and <code>learn-go-with-tests</code>'s "Unchecked errors" section.</p>
+<pre><code>An error you didn't check is a failure you didn't notice. Go returns
+errors as values — the compiler won't force you to read them, so the
+discipline is yours. Assign the error, check it, and decide what to do
+with it.
+
+Work through it in order:
+
+1. **Check before you use the result.** A function returning `(T, error)`
+   expects you to test `err` before touching `T`. The unchecked path is the
+   one where `T` is zero-valued, nil, or stale — using it silently is the
+   bug, and it surfaces at the worst moment: a nil dereference in
+   production, an empty config loaded without complaint, a file that
+   "wrote" to a closed handle.
+2. **Handle it, don't just pass it on.** Bare `return err` propagates the
+   error but loses where it happened. Add context at each layer with
+   `fmt.Errorf("doing X: %w", err)` — the `%w` verb preserves the chain so
+   `errors.Is` and `errors.As` still work upstream. A caller six frames up
+   should read "could not read config: open failed: no such file or
+   directory", not just "no such file or directory".
+3. **Handle it once.** Logging the error *and* returning it is handling it
+   twice — the log fills with duplicate lines and the top-level caller gets
+   a stripped error. Either wrap it and return it, or log it and stop. Not
+   both.
+4. **Prefer opaque errors.** Return the error with added context rather
+   than inspecting its type or value. If a caller needs to distinguish
+   error kinds, assert behaviour — an interface like `Temporary() bool` —
+   not a sentinel value (`== ErrFoo`) or a type assertion
+   (`err.(*MyError)`). Comparing `err.Error()` to a string is a code
+   smell: the message is for humans, not for program logic, and a
+   reworded message silently breaks the check.
+
+Suppressing the warning with `_ =` or a blank assignment hides the
+question instead of answering it. If the error genuinely cannot occur, a
+comment saying so is cheaper than a silent discard that masks the one
+time it does.
+
+{% include "includes/line_level_issues.md" %}</code></pre>
+</div>
+
+<div class="card accent">
+<h3><code>plugins/go/src/habit_hooks_go/guides/copied-lock.md</code> <span class="tag new">NEW</span></h3>
+<p>Grounded in <code>learn-go-with-tests</code> sync chapter ("A Mutex must not
+be copied after first use") and the <code>go vet</code> copylocks analyzer.</p>
+<pre><code>A mutex copied is a lock broken. Go copies values on every assignment
+and function call, and `sync.Mutex` documents "must not be copied after
+first use" — the copy's lock state is undefined, and the original's
+protection is silently gone. Two goroutines can enter the critical section
+through what they think is the same lock but are actually two.
+
+The fix is a pointer. Pass `*Counter`, not `Counter`. If the struct lives
+in a receiver, use a pointer receiver. If callers construct the value,
+give them a constructor (`NewCounter()`) so they receive a pointer from
+the start and never have the chance to copy by value.
+
+`go vet` catches this — do not silence it. A `go vet` pass on a struct
+containing a mutex is not a suggestion, it is a bug report.
+
+{% include "includes/line_level_issues.md" %}</code></pre>
+</div>
+
+<!-- ================================================================ -->
+<h2>Acceptance Criterion</h2>
+<!-- ================================================================ -->
+
+<div class="card accent">
+<h3>Given-When-Then</h3>
+<p><strong>Given</strong> a Go project where <code>errcheck</code> reports an
+unchecked error return and <code>govet</code> reports a mutex copied by value,</p>
+<p><strong>When</strong> <code>habit-hooks --all</code> runs,</p>
+<p><strong>Then</strong> the output contains an <code>unchecked-error</code>
+coaching block with Go-specific guidance (check before using the result, handle
+gracefully with <code>%w</code>, handle once, prefer opaque errors),</p>
+<p><strong>And</strong> the output contains a <code>copied-lock</code> coaching
+block with Go-specific guidance (use a pointer, add a constructor),</p>
+<p><strong>And</strong> neither finding renders through <code>uncoached.md</code>.</p>
+</div>
+
+<!-- ================================================================ -->
+<h2>Test List</h2>
+<!-- ================================================================ -->
+
+<h3>Pure function tests <span class="tag existing">synthetic data</span></h3>
+<p>File: <code>plugins/go/tests/test_the_golangci_lint_pipeline_maps_findings_to_smells.py</code></p>
+<p>Add to the existing parametrized tests:</p>
+<ul>
+  <li><code>errcheck</code> entry &rarr; <code>unchecked-error</code></li>
+  <li><code>govet</code> + text "copies lock value" &rarr; <code>copied-lock</code></li>
+  <li><code>govet</code> + text "passes lock value" &rarr; <code>copied-lock</code></li>
+  <li><code>govet</code> + other text (e.g. "printf format") &rarr; <code>"govet"</code> (forwarded)</li>
+  <li><code>unused</code> + <code>"func "</code> prefix &rarr; <code>"unused"</code> (forwarded, not dropped — docs drift fix)</li>
+</ul>
+
+<h3>Acceptance spec cases <span class="tag new">real golangci-lint</span></h3>
+<p>File: <code>plugins/go/docs/go-plugin.spec.md</code></p>
+<ul>
+  <li><strong>An unchecked error is flagged</strong> — a function calling <code>os.Open</code> and discarding the error &rarr; <code>unchecked-error</code> finding with <code>source: "golangci-lint:errcheck"</code></li>
+  <li><strong>A copied lock is flagged</strong> — a struct with <code>sync.Mutex</code> passed by value &rarr; <code>copied-lock</code> finding with <code>source: "golangci-lint:govet"</code></li>
+</ul>
+
+<h3>Catalogue coverage gate <span class="tag existing">existing test</span></h3>
+<p><code>tests/test_catalogue_coverage.py</code> automatically routes every new
+<code>DEFAULT_SEVERITY</code> entry through <code>rendering._resolve_guide</code>
+and asserts it resolves to a real guide, not <code>uncoached.md</code>. Adding
+the catalogue entries + guide files makes this pass with no test changes.</p>
+
+<h3>Guide-includes spec <span class="tag existing">existing spec</span></h3>
+<p>Add <code>unchecked-error</code> and <code>copied-lock</code> to the
+<code>line_level_issues.md</code> list at <code>docs/guide-includes.spec.md:28</code>.</p>
+
+<!-- ================================================================ -->
+<h2>Decision Context</h2>
+<!-- ================================================================ -->
+
+<div class="card accent">
+<h3>Problem</h3>
+<p>The Go plugin enables <code>errcheck</code> and <code>govet</code> in its
+bundled <code>.golangci.yml</code>, but their findings fall through to
+<code>return linter</code> (<code>golangci_lint_sensor.py:58</code>) and render
+through <code>uncoached.md</code> — a generic "ask yourself why the rule exists"
+prompt with zero Go context. The study shows dedicated coaching prompts
+dramatically outperform generic ones. <code>errcheck</code> is the canonical Go
+mistake that <code>learn-go-with-tests</code> dedicates an entire section to.</p>
+
+<h3>Chosen approach</h3>
+<p>Introduce two Go-specific catalogue smells (<code>unchecked-error</code>,
+<code>copied-lock</code>) with dedicated guides in the Go plugin. This converts
+the implicit functional coupling (sensor forwards raw linter name &rarr;
+<code>uncoached.md</code> assumes it knows what the linter means) into contract
+coupling (sensor maps to an explicit smell key &rarr; guide provides Go-specific
+coaching). The guide resolution infrastructure already supports this —
+<code>plugins_for_language</code> puts the Go plugin first.</p>
+
+<h3>Alternatives considered</h3>
+<ul>
+  <li><strong>Map <code>errcheck</code> &rarr; <code>swallowed-exception</code></strong> — rejected. Go has no exceptions; the error is a return value never acknowledged, not an exception caught and suppressed. The mechanism, hazard, and fix are structurally different (see Tier 1 analysis table).</li>
+  <li><strong>Keep forwarding, improve <code>uncoached.md</code></strong> — rejected. A generic guide cannot provide Go-specific coaching (pointer receivers, <code>%w</code> wrapping, opaque errors) without being wrong for other languages.</li>
+  <li><strong>Drop <code>errcheck</code>/<code>govet</code> from <code>.golangci.yml</code></strong> — rejected. The "ship it forwards, coach it later" stance is by design (confirmed in Phase 2). Removing the linters would create false-clean runs.</li>
+</ul>
+
+<h3>Constraints</h3>
+<ul>
+  <li><code>dependencies = []</code> — the Go plugin cannot import the core or other plugins. Guides are resolved by filename through the override chain, not by imports.</li>
+  <li><code>govet</code> is a multi-analyzer linter — text-based routing is required, same as <code>unused</code>/<code>typecheck</code>. The copylocks analyzer's text contains "copies lock value" or "passes lock value".</li>
+  <li>The <code>str | None</code> return type on <code>smell_of</code> and the <code>if smell is None: continue</code> guard in <code>findings()</code> are dead code (no path returns <code>None</code>) — leftovers from the abandoned "drop" design. Left as-is to keep this slice focused; the docs fix reconciles the design rationale, not the type signature.</li>
+</ul>
+
+<h3>Dave Cheney error handling practices in the guide</h3>
+<p>The <code>unchecked-error.md</code> guide weaves in four practices from
+<a href="https://dave.cheney.net/2016/04/27/dont-just-check-errors-handle-them-gracefully">"Don't just check errors, handle them gracefully"</a>:</p>
+<ol>
+  <li><strong>Handle it, don't just pass it on</strong> — add context with <code>fmt.Errorf("...: %w", err)</code> at each layer</li>
+  <li><strong>Handle it once</strong> — don't both log and return (duplicate log lines, stripped error at top level)</li>
+  <li><strong>Prefer opaque errors</strong> — return with context, don't inspect type or value</li>
+  <li><strong>Assert behaviour, not type</strong> — use interfaces (<code>Temporary() bool</code>), not sentinel values or type assertions; never inspect <code>err.Error()</code> string</li>
+</ol>
+</div>
+
+<!-- ================================================================ -->
+<h2>Files to Create / Modify</h2>
+<!-- ================================================================ -->
+
+<div class="card">
+<div class="file-tree"><strong>Create:</strong>
+plugins/go/src/habit_hooks_go/
+  guides/                                    # NEW directory (first Go-specific guides)
+    unchecked-error.md
+    copied-lock.md
+
+<strong>Modify:</strong>
+src/habit_hooks/catalogue.py                 # +2 entries in DEFAULT_SEVERITY
+plugins/go/src/habit_hooks_go/sensors/
+  golangci_lint_sensor.py                    # +errcheck in SMELL_BY_LINTER, +govet text routing
+docs/smell-vocabulary.md                     # fix Go section (docs drift), add 2 smells
+docs/guide-includes.spec.md                  # add 2 smells to line_level_issues.md list
+plugins/go/docs/go-plugin.spec.md            # +2 acceptance cases</div>
+</div>
+
+<!-- ================================================================ -->
+<h2>Uses</h2>
+<!-- ================================================================ -->
+
+<div class="card green">
+<ul>
+  <li><strong><code>catalogue.py</code></strong> — add <code>unchecked-error</code> and <code>copied-lock</code> to <code>DEFAULT_SEVERITY</code> (both <code>ENFORCED</code>)</li>
+  <li><strong><code>rendering.py</code> <code>plugins_for_language</code></strong> — existing language-aware guide resolution (no change needed)</li>
+  <li><strong><code>resolve.py</code> <code>Resolver.guide</code></strong> — existing override chain (no change needed)</li>
+  <li><strong><code>.golangci.yml</code></strong> — existing <code>errcheck</code> and <code>govet</code> entries (no change needed)</li>
+  <li><strong><code>test_catalogue_coverage.py</code></strong> — existing gate (no change needed, passes once guides exist)</li>
+  <li><strong><code>learn-go-with-tests</code></strong> — <code>pointers-and-errors.md</code> "Unchecked errors" section, <code>sync.md</code> "Copying mutexes" section</li>
+  <li><strong>Dave Cheney</strong> — <a href="https://dave.cheney.net/2016/04/27/dont-just-check-errors-handle-them-gracefully">"Don't just check errors, handle them gracefully"</a></li>
+</ul>
+</div>
+
+<!-- ================================================================ -->
+<h2>Implemented</h2>
+<!-- ================================================================ -->
+
+<div class="card green">
+<p><code>errcheck</code> and <code>govet</code> (copylocks only) now map to two
+Go-specific <code>ENFORCED</code> smells — <code>unchecked-error</code> and
+<code>copied-lock</code> — each with a dedicated Go guide, so the findings are
+coached instead of falling through to <code>uncoached.md</code>.</p>
+</div>
+
+<h3>Functional Core</h3>
+<div class="card">
+<p>No new classes — pure functions plus dict entries:</p>
+<ul>
+  <li><code>smell_of()</code> text routing in
+  <code>golangci_lint_sensor.py</code>: <code>errcheck</code> &rarr;
+  <code>unchecked-error</code> (direct, in <code>SMELL_BY_LINTER</code>);
+  <code>govet</code> containing <code>"copies lock value"</code> or
+  <code>"passes lock by value"</code> &rarr; <code>copied-lock</code>, any other
+  govet analyzer &rarr; forwarded as uncoached.</li>
+  <li><code>DEFAULT_SEVERITY</code> entries in <code>catalogue.py</code>:
+  <code>unchecked-error: ENFORCED</code> and <code>copied-lock: ENFORCED</code>.</li>
+</ul>
+</div>
+
+<h3>Shell Boundaries</h3>
+<div class="card">
+<ul>
+  <li><strong><code>golangci_lint_sensor.py</code></strong> — sensor that maps
+  golangci-lint v2 issues by linter + text to canonical findings.</li>
+  <li><strong><code>catalogue.py</code></strong> — the core severity table the
+  two new smells register in (both fail the run at exit 1).</li>
+  <li><strong>Go plugin <code>guides/</code> directory</strong> — first
+  Go-specific guides: <code>unchecked-error.md</code> (Cheney + learn-go-with-tests)
+  and <code>copied-lock.md</code>, both including
+  <code>includes/line_level_issues.md</code>.</li>
+</ul>
+</div>
+
+<h3>Unit Tests</h3>
+<div class="card">
+<ul>
+  <li><code>plugins/go/tests/test_the_golangci_lint_pipeline_maps_findings_to_smells.py</code>
+  — errcheck &rarr; <code>unchecked-error</code>; govet
+  <code>copies lock value</code> &rarr; <code>copied-lock</code>; govet
+  <code>passes lock by value</code> &rarr; <code>copied-lock</code>; govet
+  other text &rarr; forwarded as <code>govet</code>.</li>
+  <li><code>tests/test_catalogue_coverage.py</code> — <code>sorted(resolved,
+  key=str)</code> fix so the coverage-gate failure message sorts names without a
+  <code>KeyError</code> on mixed <code>None</code> values.</li>
+</ul>
+</div>
+
+<h3>Acceptance Tests</h3>
+<div class="card">
+<ul>
+  <li><code>plugins/go/docs/go-plugin.spec.md</code> — "An unchecked error is
+  flagged" (<code>os.Open</code> bare statement &rarr; <code>unchecked-error</code>)
+  and "A copied lock is flagged" (<code>Counter</code> with <code>sync.Mutex</code>
+  copied by value &rarr; <code>copied-lock</code>).</li>
+</ul>
+</div>
+
+<h3>Commits</h3>
+<div class="card">
+<table>
+  <thead>
+    <tr><th>Hash</th><th>Message</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>7e31437</code></td><td>Map errcheck findings to unchecked-error</td></tr>
+    <tr><td><code>c086fbb</code></td><td>Map govet copylocks findings to copied-lock smell</td></tr>
+    <tr><td><code>51d9fae</code></td><td>Add acceptance test: errcheck finding maps to unchecked-error</td></tr>
+    <tr><td><code>a0bf093</code></td><td>Add acceptance test: govet copylocks finding maps to copied-lock</td></tr>
+    <tr><td><code>b0ef1a9</code></td><td>Add unit tests: govet text routing for copied-lock and forwarded govet</td></tr>
+    <tr><td><code>ca6c998</code></td><td>Catalogue unchecked-error as ENFORCED with Go-specific guide</td></tr>
+    <tr><td><code>18b634a</code></td><td>Catalogue copied-lock as ENFORCED with Go-specific guide</td></tr>
+    <tr><td><code>e7709ed</code></td><td>Update smell-vocabulary and guide-includes docs for Go smells</td></tr>
+  </tbody>
+</table>
+</div>
+
+</div>
+</body>
+</html>
