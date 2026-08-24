@@ -17,4 +17,5 @@ linters:
     - govet
     - staticcheck
     - contextcheck
+    - recvcheck
     - interfacebloat

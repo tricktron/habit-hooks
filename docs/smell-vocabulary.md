@@ -199,6 +199,9 @@ the catalogue is shared — only the plugin's sensors differ).
 | `errcheck`       | (any)                   | `unchecked-error`     |
 | `govet`          | contains `"copies lock value"` or `"passes lock by value"` | `copied-lock` |
 | `govet`          | (other)                 | forwarded (uncoached) |
+| `interfacebloat` | (any)                   | `interface-pollution`         |
+| `contextcheck`   | (any)                   | `missing-context-propagation` |
+| `recvcheck`      | (any)                   | `mixed-receiver-types`        |
 
 `unused` and `typecheck` are ambiguous — golangci-lint's message text is the only
 way to tell one smell from another under them, which is why the Go plugin routes
@@ -213,11 +216,12 @@ analyzer's findings (an assignment copying a lock-holding value, or a call
 passing one by value) map to `copied-lock`, while any other analyzer's finding
 is **forwarded as uncoached** under `govet`. Still-unmapped linters (anything
 beyond the rows above) are likewise forwarded as uncoached. The bundled
-`.golangci.yml` enables seven linters — `gocyclo`, `funlen`, `ineffassign`,
-`unused`, `errcheck`, `govet`, and `staticcheck`. Of those, only `staticcheck`
-still forwards as uncoached: `errcheck` maps every finding to `unchecked-error`
-(an unchecked error return is always the same hazard), so a real defect is never
-silently dropped.
+`.golangci.yml` enables ten linters — `gocyclo`, `funlen`, `ineffassign`,
+`unused`, `errcheck`, `govet`, `staticcheck`, `interfacebloat`,
+`contextcheck`, and `recvcheck`. Of those, only `staticcheck` still forwards
+as uncoached: `errcheck` maps every finding to `unchecked-error` (an unchecked
+error return is always the same hazard), so a real defect is never silently
+dropped.
 
 ## Uncoached smells
 

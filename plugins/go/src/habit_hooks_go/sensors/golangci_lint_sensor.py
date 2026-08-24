@@ -31,6 +31,7 @@ SMELL_BY_LINTER = {
     "funlen": "oversized-function",
     "ineffassign": "unused-variable",
     "interfacebloat": "interface-pollution",
+    "recvcheck": "mixed-receiver-types",
 }
 
 def split_argv(argv: list[str]) -> tuple[list[str], list[str]]:

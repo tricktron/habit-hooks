@@ -37,6 +37,7 @@ DEFAULT_SEVERITY: dict[str, str] = {
     "unchecked-error": ENFORCED,
     "missing-context-propagation": ENFORCED,
     "interface-pollution": SUGGESTED,
+    "mixed-receiver-types": SUGGESTED,
     "swallowed-exception": SUGGESTED,
     "parse-error": ENFORCED,
     INCOMPLETE_RUN: ENFORCED,

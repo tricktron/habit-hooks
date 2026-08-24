@@ -638,3 +638,61 @@ habit-sensors --all | jq '.[] | {smell, language, key: (.issues[0].key | sub(".*
   "source": "golangci-lint:contextcheck"
 }
 ```
+
+## Mixed receiver types are flagged
+
+The bundled `.golangci.yml` enables `recvcheck`, which reports a type whose
+methods mix value and pointer receivers — `the methods of "Counter" use pointer
+receiver and non-pointer receiver`. A value receiver makes the method operate
+on a copy, so whether a call changes the original is a per-method fact a reader
+has to check instead of one a type-wide rule answers: `Value` reads, `Increment`
+mutates, and only the receiver type marks which is which. The fixture's
+`Counter` carries one of each — nothing else — so the inconsistency is the one
+thing the linter can name.
+
+`recvcheck` is a standalone linter with an unambiguous `FromLinter`, so it gets
+a direct mapping rather than text routing: the sensor maps `recvcheck` →
+`mixed-receiver-types` (`smell_of`), stamping `source: "golangci-lint:recvcheck"`
+on the issue. It is a design smell, not a runtime hazard — the code compiles and
+runs; the silent-copy hazard is only real when a value receiver sits on a
+mutating method, and `recvcheck` flags the inconsistency, not the mutation — so
+it coaches but does not fail the run (suggested severity).
+
+The fixture stays a single smell: `Counter` and its methods are exported (so
+`unused` never sees them), the file compiles (so `typecheck` never speaks), and
+the two one-line method bodies keep the file well under `funlen`'s and
+`gocyclo`'s defaults — the mixed receivers are the one thing this file carries.
+
+📄main.go
+```go
+package main
+
+type Counter struct {
+	n int
+}
+
+func (c Counter) Value() int {
+	return c.n
+}
+
+func (c *Counter) Increment() {
+	c.n++
+}
+
+func main() {}
+```
+
+```bash
+habit-sensors --all | jq '.[] | {smell, language, key: (.issues[0].key | sub(".*/"; "")), line: .issues[0].details.line, source: .issues[0].details.source}'
+```
+
+🖥️
+```json
+{
+  "smell": "mixed-receiver-types",
+  "language": "go",
+  "key": "main.go",
+  "line": 3,
+  "source": "golangci-lint:recvcheck"
+}
+```
