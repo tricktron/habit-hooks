@@ -33,6 +33,7 @@ DEFAULT_SEVERITY: dict[str, str] = {
     "test-only-dead-code": ENFORCED,
     "unused-dependency": ENFORCED,
     "unused-import": ENFORCED,
+    "unchecked-error": ENFORCED,
     "swallowed-exception": SUGGESTED,
     "parse-error": ENFORCED,
     INCOMPLETE_RUN: ENFORCED,

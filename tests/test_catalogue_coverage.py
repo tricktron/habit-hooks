@@ -57,7 +57,7 @@ def test_every_catalogue_smell_resolves_to_a_guide(smell: str, tmp_path: Path) -
     coached = {lang: name for lang, name in resolved.items() if name != UNCOACHED_GUIDE}
     assert coached, (
         f"catalogued smell {smell!r} renders {UNCOACHED_GUIDE} for every language "
-        f"({sorted(resolved)}) — ship a guides/{smell}.md in the plugin it belongs to"
+        f"({sorted(resolved, key=str)}) — ship a guides/{smell}.md in the plugin it belongs to"
     )
 
 
