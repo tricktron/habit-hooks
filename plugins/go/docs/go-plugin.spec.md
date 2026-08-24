@@ -475,3 +475,57 @@ habit-sensors --all | jq '.[] | {smell, language, key: (.issues[0].key | sub(".*
   "source": "golangci-lint:errcheck"
 }
 ```
+
+## A copied lock is flagged
+
+The bundled `.golangci.yml` enables `govet`, whose `copylocks` analyzer reports a
+`sync.Mutex` that got carried off in a value — `sync.Mutex` documents "must not
+be copied after first use", and copying a struct that holds one silently splits
+the lock in two. This fixture builds a `Counter` and copies it into `d`; govet
+reports `assignment copies lock value to d: demo.Counter contains sync.Mutex`,
+and the fix the guide coaches is a pointer: pass `*Counter`, not `Counter`.
+
+`govet` runs many analyzers, so it needs text routing like `unused` / `typecheck`
+rather than a wholesale mapping: a govet message containing `copies lock value`
+maps to `copied-lock` (`smell_of`), stamping `source: "golangci-lint:govet"` on
+the issue.
+
+The fixture stays a single smell: `c.mu.Lock()` / `c.mu.Unlock()` in place marks
+the field used (so `unused` never sees it), `_ = d` is an explicit use of the
+copy (so it is not left unused), and the straight-line body stays under
+`funlen`'s and `gocyclo`'s defaults — the copied lock is the one thing this file
+carries.
+
+📄main.go
+```go
+package main
+
+import "sync"
+
+type Counter struct {
+	mu sync.Mutex
+}
+
+func main() {
+	c := Counter{}
+	c.mu.Lock()
+	d := c
+	c.mu.Unlock()
+	_ = d
+}
+```
+
+```bash
+habit-sensors --all | jq '.[] | {smell, language, key: (.issues[0].key | sub(".*/"; "")), line: .issues[0].details.line, source: .issues[0].details.source}'
+```
+
+🖥️ ✅
+```json
+{
+  "smell": "copied-lock",
+  "language": "go",
+  "key": "main.go",
+  "line": 12,
+  "source": "golangci-lint:govet"
+}
+```
