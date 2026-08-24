@@ -15,6 +15,7 @@ DEFAULT_SEVERITY: dict[str, str] = {
     "too-many-parameters": ENFORCED,
     "high-complexity": ENFORCED,
     "deep-nesting": ENFORCED,
+    "copied-lock": ENFORCED,
     "oversized-file": ENFORCED,
     "unused-variable": ENFORCED,
     "loose-equality": ENFORCED,
