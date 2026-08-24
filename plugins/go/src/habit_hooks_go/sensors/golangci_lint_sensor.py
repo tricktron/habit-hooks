@@ -52,6 +52,14 @@ def smell_of(linter: str, text: str) -> str | None:
         return "unused-variable" if text.startswith("var ") else linter
     if linter == "typecheck":
         return "unused-import" if "imported and not used" in text else "parse-error"
+    if linter == "govet":
+        # govet's copylocks analyzer: both its reportings — an assignment
+        # copying a mutex-holding value and a call passing one by value — are
+        # the same bug, routing to the dedicated ``copied-lock`` smell. Any
+        # other govet analyzer's finding falls through to the forwarded name.
+        if "copies lock value" in text or "passes lock by value" in text:
+            return "copied-lock"
+        return "govet"
     # Any linter a project enabled that this plugin has no catalogue smell for
     # is forwarded under the linter's own name, surfacing through
     # ``uncoached.md`` (suggested severity). The message is specific and
