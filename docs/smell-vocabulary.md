@@ -29,6 +29,7 @@ exits 0. The mapper config can override it per project.
 | `too-many-parameters`       | Too many parameters                   | enforced         |
 | `high-complexity`           | High cyclomatic complexity            | enforced         |
 | `deep-nesting`              | Deep nesting                          | enforced         |
+| `copied-lock`               | Lock copied by value                  | enforced         |
 | `oversized-file`            | Oversized file                        | enforced         |
 | `unused-variable`           | Unused variable                       | enforced         |
 | `loose-equality`            | Loose equality                        | enforced         |
@@ -47,6 +48,7 @@ exits 0. The mapper config can override it per project.
 | `test-only-dead-code`       | Dead code alive only via a test       | enforced         |
 | `unused-dependency`         | Unused dependency                     | enforced         |
 | `unused-import`             | Unused import                         | enforced         |
+| `unchecked-error`           | Unchecked error                       | enforced         |
 | `swallowed-exception`       | Swallowed exception                   | suggested        |
 | `parse-error`               | Parse / config error                  | enforced         |
 
@@ -194,6 +196,9 @@ the catalogue is shared — only the plugin's sensors differ).
 | `unused`         | (other)                 | forwarded (uncoached) |
 | `typecheck`      | contains `imported and not used` | `unused-import` |
 | `typecheck`      | (other)                 | `parse-error`         |
+| `errcheck`       | (any)                   | `unchecked-error`     |
+| `govet`          | contains `"copies lock value"` or `"passes lock by value"` | `copied-lock` |
+| `govet`          | (other)                 | forwarded (uncoached) |
 
 `unused` and `typecheck` are ambiguous — golangci-lint's message text is the only
 way to tell one smell from another under them, which is why the Go plugin routes
@@ -202,11 +207,17 @@ on linter *and* text, not the linter alone. `unused` reports both an unused loca
 has no catalogue smell of its own, so it is **forwarded as uncoached** under the
 linter's own name (it surfaces through `uncoached.md` with suggested severity).
 `typecheck` splits the same way: an unused import is the actionable
-`unused-import`, while any other compile/type error is `parse-error`. Unmapped
-linters (anything beyond the rows above) are likewise forwarded as uncoached.
-The bundled `.golangci.yml` enables seven linters — the four the table maps plus
-`errcheck`, `govet`, and `staticcheck`, which forward as uncoached so a real
-defect is never silently dropped.
+`unused-import`, while any other compile/type error is `parse-error`.
+`govet` is a multi-analyzer linter, so it routes on text too: its copylocks
+analyzer's findings (an assignment copying a lock-holding value, or a call
+passing one by value) map to `copied-lock`, while any other analyzer's finding
+is **forwarded as uncoached** under `govet`. Still-unmapped linters (anything
+beyond the rows above) are likewise forwarded as uncoached. The bundled
+`.golangci.yml` enables seven linters — `gocyclo`, `funlen`, `ineffassign`,
+`unused`, `errcheck`, `govet`, and `staticcheck`. Of those, only `staticcheck`
+still forwards as uncoached: `errcheck` maps every finding to `unchecked-error`
+(an unchecked error return is always the same hazard), so a real defect is never
+silently dropped.
 
 ## Uncoached smells
 

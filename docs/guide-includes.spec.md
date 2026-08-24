@@ -25,7 +25,7 @@ partial under `guides/includes/`:
 
 | Partial | Format per issue | Smells |
 |---------|------------------|--------|
-| `includes/line_level_issues.md` | `{{ file }}:{{ line }}` then `  {{ content }}` if present | too-many-parameters, oversized-function, high-complexity, deep-nesting, unused-variable, unused-import, swallowed-exception, loose-equality, var-declaration, non-const-binding, duplicate-import, explicit-any, non-null-assertion, redundant-type-annotation, warning-comment, non-essential-comment |
+| `includes/line_level_issues.md` | `{{ file }}:{{ line }}` then `  {{ content }}` if present | too-many-parameters, oversized-function, high-complexity, deep-nesting, unused-variable, unused-import, swallowed-exception, loose-equality, var-declaration, non-const-binding, duplicate-import, explicit-any, non-null-assertion, redundant-type-annotation, warning-comment, non-essential-comment, unchecked-error, copied-lock |
 | `includes/file_level_issues.md` | `{{ file }}` then `  {{ content }}` if present | oversized-file, unused-file, unused-export, parse-error |
 
 A handful of smells do not fit either shape and so do **not** use a shared
