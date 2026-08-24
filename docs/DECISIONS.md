@@ -464,11 +464,14 @@ mapping, config validation) are resolved and recorded above / in
 
 ## The Go plugin wraps golangci-lint v2 (2026-08, agent decision)
 
-- **The `go` plugin wraps golangci-lint v2 and maps to seven catalogue smells**
+- **The `go` plugin wraps golangci-lint v2 and maps to ten catalogue smells**
   (`high-complexity`, `oversized-function`, `unused-variable`, `unused-import`,
-  `parse-error`, `unchecked-error`, `copied-lock`). The first five pre-date the
-  Go plugin; the last two were added for it (both ENFORCED, with Go-specific
-  guides). The plugin is a sensor + a bundled config + package scaffolding. Its
+  `parse-error`, `unchecked-error`, `copied-lock`, `interface-pollution`,
+  `missing-context-propagation`, `mixed-receiver-types`). The first five
+  pre-date the Go plugin; the last five were added for it — the two ENFORCED
+  tier-1 smells and the three tier-2 smells in the slice below, each with
+  Go-specific guides. The plugin is a sensor + a bundled config + package
+  scaffolding. Its
   `config.toml` declares `language = "go"`,
   `files = ["**/*.go", "!**/vendor/**"]` and a `golangci-lint` detector; the one
   core change is `go` joining `recommend.LANGUAGE_SIGNALS` (`go.mod`, `.go`), so
@@ -504,11 +507,14 @@ mapping, config validation) are resolved and recorded above / in
   guards five.
 - **The bundled config comes from maratori, and the project's own always wins.**
   `.golangci.yml` (`version: "2"`) enables `gocyclo`, `funlen`, `ineffassign`,
-  `unused`, `errcheck`, `govet`, and `staticcheck` — the first four the routing
-  table maps, `errcheck` maps fully to `unchecked-error`, `govet` is partially
-  mapped (copylocks → `copied-lock`, other analyzers forwarded), and only
-  `staticcheck` forwards as uncoached, so a real defect is never
-  silently dropped. The sensor threads the config exactly like jscpd/eslint/knip: a project's own config
+  `unused`, `errcheck`, `govet`, `staticcheck`, `interfacebloat`,
+  `contextcheck`, and `recvcheck` — the first four the routing table maps,
+  `errcheck` maps fully to `unchecked-error`, `govet` is partially mapped
+  (copylocks → `copied-lock`, other analyzers forwarded), the three tier-2
+  linters each map directly (`interfacebloat` → `interface-pollution`,
+  `contextcheck` → `missing-context-propagation`, `recvcheck` →
+  `mixed-receiver-types`), and only `staticcheck` forwards as uncoached, so a
+  real defect is never silently dropped. The sensor threads the config exactly like jscpd/eslint/knip: a project's own config
   (named in args or discovered on disk) is passed to golangci-lint untouched, and
   the bundled one is only the fallback for "this project has none".
 - **Pre-`--` args are forwarded to golangci-lint verbatim** — the same
@@ -544,3 +550,32 @@ mapping, config validation) are resolved and recorded above / in
   shape, and the sensor matches that substring verbatim. A shorter `passes lock
   value` would never match and would silently forward every call-site finding
   as uncoached — the exact false-clean the routing exists to prevent.
+
+## Go smells tier 2: `interface-pollution`, `missing-context-propagation`, `mixed-receiver-types` (2026-08, agent decision)
+
+- **Three new Go smells, each from a standalone golangci-lint v2 linter.** The
+  three Tier 2 linters (`interfacebloat`, `contextcheck`, `recvcheck`) all have
+  unambiguous `FromLinter` names and produce one kind of finding, so — unlike
+  `unused`/`typecheck`/`govet` — they need no text routing: a direct entry in
+  `SMELL_BY_LINTER` maps each. Adding a linter to the bundled config is one line
+  because `default: none` makes `enable` the exhaustive set: anything unlisted
+  cannot run, so an unmapped linter can never produce a finding the sensor
+  silently drops.
+- **`missing-context-propagation` is ENFORCED; the other two are SUGGESTED.** A
+  severed cancellation tree is a runtime hazard — goroutines outlive the
+  request, deadlines are lost, a disconnected client is still served — same
+  severity as `unchecked-error` and `copied-lock`. Interface pollution and mixed
+  receivers are design issues: the code runs, it is just harder to test and
+  maintain, so they coach without failing the run.
+- **`interfacebloat` is not `too-many-parameters`.** That smell is about function
+  parameter count; interface method count is a different hazard (consumer
+  stubbing burden, not call-site complexity) with a different fix (split the
+  interface, not reduce the parameters). A merged smell would mis-coach both.
+- **`recvcheck` flags inconsistency, not mutation.** A value receiver on a
+  mutating method is where the silent-copy hazard is real, but `recvcheck`
+  reports the type-wide mix of value and pointer receivers — so it is coached as
+  a consistency rule (pick one receiver type per struct), not as a mutation bug.
+- **Each ships a Go-specific guide grounded in `learn-go-with-tests`.** The
+  guides name the idiomatic fix — split the interface or let consumers declare
+  their own; pass `ctx` first and derive never replace; pick one receiver type —
+  not a translated generic, and not `uncoached.md`.
