@@ -74,7 +74,7 @@
                 python3 -m venv .venv
                 uv pip install --python .venv/bin/python \
                   -e plugins/generic -e plugins/python \
-                  -e plugins/typescript -e plugins/php -e plugins/java \
+                  -e plugins/typescript -e plugins/php -e plugins/java -e plugins/go \
                   -e . pytest markdown-it-py packaging
                 touch .venv/.habit-hooks-nix-dev
               fi
