@@ -25,6 +25,7 @@ from golangci_lint_runner import (
 
 SMELL_BY_LINTER = {
     "cyclop": "high-complexity",
+    "errcheck": "unchecked-error",
     "gocyclo": "high-complexity",
     "funlen": "oversized-function",
     "ineffassign": "unused-variable",

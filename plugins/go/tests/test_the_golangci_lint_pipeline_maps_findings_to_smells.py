@@ -76,6 +76,18 @@ def test_every_mapped_linter_reaches_its_own_smell(linter: str) -> None:
     assert result[0]["issues"][0]["details"]["source"] == f"golangci-lint:{linter}"
 
 
+def test_errcheck_is_unchecked_error() -> None:
+    """errcheck reports a call whose error return is discarded, and every one of
+    its findings is an unchecked return — no text ambiguity — so it maps straight
+    from the linter table to ``unchecked-error``. Hardcoded rather than relying on
+    the ``SMELL_BY_LINTER`` parametrization, so adding the table entry is what
+    turns it green."""
+    result = findings([_entry("errcheck")], _BASE)
+
+    assert [finding["smell"] for finding in result] == ["unchecked-error"]
+    assert result[0]["issues"][0]["details"]["source"] == "golangci-lint:errcheck"
+
+
 def test_unused_with_var_prefix_is_unused_variable() -> None:
     entry = _entry("unused")
     entry["Text"] = "var x is unused"
