@@ -529,3 +529,112 @@ habit-sensors --all | jq '.[] | {smell, language, key: (.issues[0].key | sub(".*
   "source": "golangci-lint:govet"
 }
 ```
+
+## Interface pollution is flagged
+
+The bundled `.golangci.yml` enables `interfacebloat`, which reports an interface
+with more than 10 methods (its default threshold, reported when *greater than*
+10). An interface with **11** methods — a `Worker` whose contract is a wish
+list — trips it. The fixture's empty method bodies are the interface's own
+definition (each compiles to its required signature), so the file parses
+(`typecheck` never speaks), `main` is used by the runtime (so `unused` never
+sees the package-scope `Worker`), and there is no function body to blow
+`funlen`'s or `gocyclo`'s defaults — the oversized contract is the one smell
+this file carries.
+
+`interfacebloat` is a standalone linter with an unambiguous `FromLinter`, so it
+gets a direct mapping rather than text routing: the sensor maps
+`interfacebloat` → `interface-pollution` (`smell_of`), stamping
+`source: "golangci-lint:interfacebloat"` on the issue. It is a design smell, not
+a runtime hazard — the code works, it is just harder to test and maintain — so
+it coaches but does not fail the run (suggested severity).
+
+📄main.go
+```go
+package main
+
+type Worker interface {
+	Method1()
+	Method2()
+	Method3()
+	Method4()
+	Method5()
+	Method6()
+	Method7()
+	Method8()
+	Method9()
+	Method10()
+	Method11()
+}
+
+func main() {}
+```
+
+```bash
+habit-sensors --all | jq '.[] | {smell, language, key: (.issues[0].key | sub(".*/"; "")), line: .issues[0].details.line, source: .issues[0].details.source}'
+```
+
+🖥️
+```json
+{
+  "smell": "interface-pollution",
+  "language": "go",
+  "key": "main.go",
+  "line": 3,
+  "source": "golangci-lint:interfacebloat"
+}
+```
+
+## Missing context propagation is flagged
+
+The bundled `.golangci.yml` enables `contextcheck`, which reports a function
+that creates a fresh `context.Background()` / `context.TODO()` where the
+`context.Context` parameter it was handed should have been flowed through.
+`f` takes `ctx context.Context` but hands its callee `work` a brand-new
+`context.Background()` — a call that could just as well have taken `ctx` —
+severing the cancellation tree. `main` calls `f(context.Background())` from a
+function with no context parameter, so there is nothing there to propagate and
+`contextcheck` stays silent on it. The file otherwise compiles (so `typecheck`
+never speaks), `work` and `f` are both called (so `unused` never sees them),
+and the straight-line bodies stay under `funlen`'s and `gocyclo`'s defaults —
+the severed context is the one smell this file carries.
+
+`contextcheck` is a standalone linter with an unambiguous `FromLinter`, so it
+gets a direct mapping rather than text routing: the sensor maps `contextcheck`
+→ `missing-context-propagation` (`smell_of`), stamping
+`source: "golangci-lint:contextcheck"` on the issue. It is a runtime hazard,
+not a design smell — a broken cancellation tree lets goroutines outlive the
+request — so it fails the run (enforced severity), like `unchecked-error` and
+`copied-lock`.
+
+📄main.go
+```go
+package main
+
+import "context"
+
+func work(ctx context.Context) {}
+
+func f(ctx context.Context) {
+	work(context.Background())
+}
+
+func main() {
+	f(context.Background())
+}
+```
+
+```bash
+habit-sensors --all | jq '.[] | {smell, language, key: (.issues[0].key | sub(".*/"; "")), line: .issues[0].details.line, source: .issues[0].details.source}'
+```
+
+🖥️ ✅
+```json
+{
+  "smell": "missing-context-propagation",
+  "language": "go",
+  "key": "main.go",
+  "line": 8,
+  "source": "golangci-lint:contextcheck"
+}
+```

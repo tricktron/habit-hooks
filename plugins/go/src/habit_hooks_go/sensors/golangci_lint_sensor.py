@@ -24,11 +24,13 @@ from golangci_lint_runner import (
 )
 
 SMELL_BY_LINTER = {
+    "contextcheck": "missing-context-propagation",
     "cyclop": "high-complexity",
     "errcheck": "unchecked-error",
     "gocyclo": "high-complexity",
     "funlen": "oversized-function",
     "ineffassign": "unused-variable",
+    "interfacebloat": "interface-pollution",
 }
 
 def split_argv(argv: list[str]) -> tuple[list[str], list[str]]:

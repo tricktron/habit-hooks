@@ -16,3 +16,5 @@ linters:
     - errcheck
     - govet
     - staticcheck
+    - contextcheck
+    - interfacebloat
