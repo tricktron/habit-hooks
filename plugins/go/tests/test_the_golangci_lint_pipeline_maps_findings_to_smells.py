@@ -126,3 +126,42 @@ def test_typecheck_with_other_text_is_parse_error() -> None:
 
     assert [finding["smell"] for finding in result] == ["parse-error"]
     assert result[0]["issues"][0]["details"]["source"] == "golangci-lint:typecheck"
+
+
+def test_govet_with_copies_lock_value_is_copied_lock() -> None:
+    """govet's copylocks analyzer reports an assignment that copies a value
+    containing a ``sync.Mutex``; that text routes to the dedicated
+    ``copied-lock`` smell rather than the forwarded linter name."""
+    entry = _entry("govet")
+    entry["Text"] = "assignment copies lock value to d: demo.Counter contains sync.Mutex"
+
+    result = findings([entry], _BASE)
+
+    assert [finding["smell"] for finding in result] == ["copied-lock"]
+    assert result[0]["issues"][0]["details"]["source"] == "golangci-lint:govet"
+
+
+def test_govet_with_passes_lock_by_value_is_copied_lock() -> None:
+    """The other half of the copylocks analyzer: a function call that passes a
+    mutex-holding value by value is the same bug as copying it in an
+    assignment, so it routes to ``copied-lock`` too."""
+    entry = _entry("govet")
+    entry["Text"] = "func call passes lock by value: demo.Counter contains sync.Mutex"
+
+    result = findings([entry], _BASE)
+
+    assert [finding["smell"] for finding in result] == ["copied-lock"]
+    assert result[0]["issues"][0]["details"]["source"] == "golangci-lint:govet"
+
+
+def test_govet_with_other_text_is_forwarded_as_uncoached() -> None:
+    """govet bundles several analyzers; a finding that is not the copylocks
+    text is no known Go smell, so it forwards under the linter's own name to
+    surface through ``uncoached.md``."""
+    entry = _entry("govet")
+    entry["Text"] = "printf format"
+
+    result = findings([entry], _BASE)
+
+    assert [finding["smell"] for finding in result] == ["govet"]
+    assert result[0]["issues"][0]["details"]["source"] == "golangci-lint:govet"
