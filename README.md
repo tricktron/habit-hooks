@@ -288,7 +288,8 @@ More: [`docs/architecture.md`](https://github.com/habit-hooks/habit-hooks/blob/m
 **Enforced** — `oversized-function` · `too-many-parameters` · `high-complexity` · `deep-nesting` ·
 `oversized-file` · `unused-variable` · `unused-import` · `loose-equality` · `var-declaration` ·
 `non-const-binding` · `duplicate-import` · `redundant-type-annotation` · `unused-class-member` ·
-`unused-file` · `unused-export` · `unused-dependency` · `test-only-dead-code` · `parse-error`
+`unused-file` · `unused-export` · `unused-dependency` · `test-only-dead-code` · `unchecked-error` ·
+`copied-lock` · `parse-error`
 
 **Suggested** — `warning-comment` · `explicit-any` · `non-null-assertion` · `non-essential-comment` ·
 `duplicated-code` · `swallowed-exception`

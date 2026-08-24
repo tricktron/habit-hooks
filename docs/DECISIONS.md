@@ -464,11 +464,11 @@ mapping, config validation) are resolved and recorded above / in
 
 ## The Go plugin wraps golangci-lint v2 (2026-08, agent decision)
 
-- **The `go` plugin wraps golangci-lint v2 and maps to the five existing
-  catalogue smells** (`high-complexity`, `oversized-function`, `unused-variable`,
-  `unused-import`, `parse-error`). No new catalogue entries and no new guides:
-  every smell it emits already has an enforced entry and a generic guide, so the
-  plugin is a sensor + a bundled config + package scaffolding. Its
+- **The `go` plugin wraps golangci-lint v2 and maps to seven catalogue smells**
+  (`high-complexity`, `oversized-function`, `unused-variable`, `unused-import`,
+  `parse-error`, `unchecked-error`, `copied-lock`). The first five pre-date the
+  Go plugin; the last two were added for it (both ENFORCED, with Go-specific
+  guides). The plugin is a sensor + a bundled config + package scaffolding. Its
   `config.toml` declares `language = "go"`,
   `files = ["**/*.go", "!**/vendor/**"]` and a `golangci-lint` detector; the one
   core change is `go` joining `recommend.LANGUAGE_SIGNALS` (`go.mod`, `.go`), so
@@ -505,7 +505,9 @@ mapping, config validation) are resolved and recorded above / in
 - **The bundled config comes from maratori, and the project's own always wins.**
   `.golangci.yml` (`version: "2"`) enables `gocyclo`, `funlen`, `ineffassign`,
   `unused`, `errcheck`, `govet`, and `staticcheck` — the first four the routing
-  table maps, the last three forwarded as uncoached so a real defect is never
+  table maps, `errcheck` maps fully to `unchecked-error`, `govet` is partially
+  mapped (copylocks → `copied-lock`, other analyzers forwarded), and only
+  `staticcheck` forwards as uncoached, so a real defect is never
   silently dropped. The sensor threads the config exactly like jscpd/eslint/knip: a project's own config
   (named in args or discovered on disk) is passed to golangci-lint untouched, and
   the bundled one is only the fallback for "this project has none".
@@ -513,3 +515,32 @@ mapping, config validation) are resolved and recorded above / in
   split-on-the-last-`--` PMD uses, so a project's own `--config` and flags reach
   the tool while `${files}` files follow the separator. Before this, the whole
   `${args}` half was dropped.
+
+## Go smells tier 1: `unchecked-error` and `copied-lock` (2026-08, agent decision)
+
+- **Two new ENFORCED smells, each with its own Go-specific guide.**
+  `unchecked-error` maps every `errcheck` finding — an unchecked error return is
+  always the same hazard, so there is no text-routing needed. `copied-lock` maps
+  govet's copylocks analyzer findings — both shapes (an assignment copying a
+  lock-holding value, and a call passing one by value) are the same bug. Both
+  ship as ENFORCED with guides under `plugins/go/.../guides/`.
+- **`errcheck → unchecked-error`, not `swallowed-exception`.** The catalogue
+  already has `swallowed-exception` (suggested), but Go has no exceptions: the
+  error is a return value the caller never acknowledged, not an exception caught
+  and suppressed. Routing `errcheck` there would mis-coach every Go finding with
+  a guide whose remedy (`catch` block) does not exist in the language. A
+  dedicated smell with its own guide names the actual fix (check the return or
+  explicitly discard it with `_ =`).
+- **govet routes on text, following the `unused`/`typecheck` pattern.** govet is
+  a multi-analyzer linter under one `FromLinter` name, so — like `unused`
+  (`var ` prefix → `unused-variable`, else forwarded) and `typecheck`
+  (`imported and not used` → `unused-import`, else `parse-error`) — the sensor
+  inspects `Text` to pick the smell. The copylocks analyzer's two reportings
+  both contain `copies lock value` or `passes lock by value` and route to
+  `copied-lock`; any other govet analyzer's finding is forwarded under `govet`
+  as uncoached (it surfaces through `uncoached.md` with suggested severity).
+- **The substring is `passes lock by value`, not `passes lock value`.** govet's
+  copylocks analyzer emits exactly `passes lock by value` for the call-site
+  shape, and the sensor matches that substring verbatim. A shorter `passes lock
+  value` would never match and would silently forward every call-site finding
+  as uncoached — the exact false-clean the routing exists to prevent.
